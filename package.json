@@ -1,0 +1,36 @@
+{
+  "name": "aqa-agent",
+  "version": "0.1.0",
+  "description": "Agentic AI for QA test automation — Playwright + TypeScript + gRPC",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "sync-protos": "tsx src/scripts/sync-protos.ts",
+    "eval": "tsx src/scripts/run-eval.ts",
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "aqa",
+    "agent",
+    "playwright",
+    "grpc",
+    "anthropic"
+  ],
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
+    "dotenv": "^17.3.1",
+    "glob": "^13.0.6",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.4.0"
+  }
+}
