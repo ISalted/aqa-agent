@@ -2,15 +2,16 @@ import "dotenv/config";
 import { execSync } from "child_process";
 import { existsSync, mkdirSync, cpSync, readdirSync } from "fs";
 import { join, basename } from "path";
+import { fileURLToPath } from "url";
 
 const PROTO_REPO = process.env.PROTO_CONTRACTS_REPO;
 const SKILL_TRADE_PATH = process.env.SKILL_TRADE_PATH;
 const TMP_DIR = "/tmp/aqa-proto-sync";
+const PROTO_GENERATE_COMMAND = "npm run proto";
 
-async function syncProtos(): Promise<void> {
+export async function syncProtos(): Promise<void> {
   if (!PROTO_REPO || !SKILL_TRADE_PATH) {
-    console.error("Missing PROTO_CONTRACTS_REPO or SKILL_TRADE_PATH in .env");
-    process.exit(1);
+    throw new Error("Missing PROTO_CONTRACTS_REPO or SKILL_TRADE_PATH in .env");
   }
 
   const targetDir = join(SKILL_TRADE_PATH, "lib/clients/gRPC/proto");
@@ -47,7 +48,13 @@ async function syncProtos(): Promise<void> {
   }
 
   console.log(`\nDone: ${copied} proto files synced.`);
-  console.log("Run 'npm run proto' in skill-trade to regenerate types.");
+  console.log("Regenerating generated gRPC/types in skill-trade...");
+  execSync(PROTO_GENERATE_COMMAND, {
+    cwd: SKILL_TRADE_PATH,
+    stdio: "inherit",
+    timeout: 120_000,
+  });
+  console.log("Generated types sync complete.");
 }
 
 function findProtoFiles(dir: string): string[] {
@@ -68,7 +75,11 @@ function findProtoFiles(dir: string): string[] {
   return results;
 }
 
-syncProtos().catch((e) => {
-  console.error("Sync failed:", e.message);
-  process.exit(1);
-});
+const isDirectRun = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isDirectRun) {
+  syncProtos().catch((e) => {
+    console.error("Sync failed:", e.message);
+    process.exit(1);
+  });
+}

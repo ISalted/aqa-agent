@@ -10,7 +10,7 @@ import { createCheckers } from 'ts-interface-checker';
 // ... other imports
 
 test.describe('{ServiceName} — {MethodName}', () => {
-  
+
   test('Schema | Validate response', async ({ grpcClient }) => {
     // Schema validation — ALWAYS FIRST
   });
@@ -27,9 +27,20 @@ test.describe('{ServiceName} — {MethodName}', () => {
 
 ## Test Naming
 
-Format: `{TEST-ID} | {Type} | {Short description}`
-- TEST-ID: `{SERVICE-PREFIX}-{NUMBER}` (e.g., CW-001, ME-001)
-- Type: Schema, Positive, Negative, Boundary, Edge
+Format: `{TEST-ID}: {Short description}`
+- TEST-ID: `{PREFIX}-{NNN}`
+- PREFIX: exactly 3 uppercase letters derived from the method/topic mnemonic
+- NNN: zero-padded sequence starting from `001`
+- The schema test is always first and must also use the same sequence
+- Do NOT use `Schema | ...`, `Positive | ...`, or unnumbered titles
+
+Examples:
+- `UCW-001: Schema validation for UpdateClientWallet response`
+- `UCW-002: Deposit increases wallet balance`
+- `GCW-001: Schema validation for GetClientWallets response`
+- `CRG-001: Cancel registration for registered account succeeds`
+
+The scenario type (`schema`, `positive`, `negative`, `boundary`, `edge`) belongs in metadata/plan fields, not in the human-readable test title prefix.
 
 ## Service Wrapper Calls
 

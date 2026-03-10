@@ -28,14 +28,34 @@ export function validatePlan(plan: TestPlan): GuardrailResult {
     errors.push("Plan must include at least one positive (happy path) test");
   }
 
-  const ids = plan.testCases.map((t) => t.id);
+  const ids = [plan.schemaTest.id, ...plan.testCases.map((t) => t.id)];
   if (new Set(ids).size !== ids.length) {
     errors.push("Duplicate test case IDs detected");
+  }
+
+  const allCases = [plan.schemaTest, ...plan.testCases];
+  const idPattern = /^[A-Z]{3}-\d{3}$/;
+  for (const tc of allCases) {
+    if (!idPattern.test(tc.id)) {
+      errors.push(`Test case ${tc.id || "<missing>"} must match ID format AAA-001`);
+    }
+    if (!tc.name.startsWith(`${tc.id}: `)) {
+      errors.push(`Test case ${tc.id} name must start with "${tc.id}: "`);
+    }
+  }
+
+  if (!idPattern.test(plan.schemaTest.id)) {
+    errors.push("Schema test must use ID format AAA-001");
+  }
+  if (!/\-001$/.test(plan.schemaTest.id)) {
+    errors.push("Schema test must be the first numbered case and end with -001");
   }
 
   for (const tc of plan.testCases) {
     validateTestCase(tc, errors, warnings);
   }
+
+  validateTestCase(plan.schemaTest, errors, warnings);
 
   if (plan.testCases.length > 20) {
     warnings.push(`Plan has ${plan.testCases.length} test cases — consider splitting`);

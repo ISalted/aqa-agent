@@ -73,13 +73,14 @@ export async function agenticLoop(
       };
     }
 
+    const budgetTokens = effortToBudget(effort);
     const response = await client.messages.create({
       model: modelId,
-      max_tokens: 8192,
+      max_tokens: Math.max(16384, budgetTokens + 4096),
       system,
       messages,
       tools: tools as Anthropic.Tool[],
-      thinking: { type: "enabled", budget_tokens: effortToBudget(effort) },
+      thinking: { type: "enabled", budget_tokens: budgetTokens },
     });
 
     trackStep(costAccumulator, `${stepName}:turn-${turn}`, agentName, model, {

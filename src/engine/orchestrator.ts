@@ -14,6 +14,7 @@ import {
   updateServiceIndex,
 } from "../memory/project-index.js";
 import { appendRunHistory, saveRunLedger } from "../memory/run-history.js";
+import { emitPipelineEvent } from "../events.js";
 import type {
   RunState,
   ParsedIntent,
@@ -56,6 +57,11 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
   const startMs = Date.now();
 
   log(state, "Pipeline started");
+  emitPipelineEvent("started", state.runId, {
+    service: state.service,
+    action: state.intent.action,
+    methods: state.intent.methods,
+  });
 
   try {
     // ─── Phase: Resolve Infrastructure ──────────────────────
@@ -156,6 +162,7 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
           methodResult.status = "skipped";
           log(state, `  No existing test file for ${method}, skipping fix`);
           methodResult.cost = state.cost.totalUsd - costBefore;
+          emitMethodResult(state, methodResult);
           continue;
         }
 
@@ -172,6 +179,7 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
           methodResult.status = "passed";
           log(state, `  Already passing: ${currentTestResult.passed} tests`);
           methodResult.cost = state.cost.totalUsd - costBefore;
+          emitMethodResult(state, methodResult);
           continue;
         }
 
@@ -215,6 +223,7 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
         }
 
         methodResult.cost = state.cost.totalUsd - costBefore;
+        emitMethodResult(state, methodResult);
         continue;
       }
 
@@ -242,6 +251,7 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
         }
 
         methodResult.cost = state.cost.totalUsd - costBefore;
+        emitMethodResult(state, methodResult);
         continue;
       }
 
@@ -268,6 +278,7 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
           duration: 0,
           error: planResult.error,
         });
+        emitMethodResult(state, methodResult);
         continue;
       }
 
@@ -278,6 +289,7 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
       methodResult.plan = planResult.plan;
       methodResult.status = "planned";
       log(state, `  Plan OK: ${planResult.plan.testCases.length + 1} test cases`);
+      emitMethodResult(state, methodResult);
 
       // ─── Write ────────────────────────────────────────
       state.phase = "implement";
@@ -294,6 +306,7 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
       if (!writeResult.code) {
         methodResult.status = "failed";
         log(state, `  Write FAILED: ${writeResult.error}`);
+        emitMethodResult(state, methodResult);
         continue;
       }
 
@@ -315,6 +328,7 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
           error: `Guardrail rejected: ${codeValidation.errors.join("; ")}`,
         });
         methodResult.cost = state.cost.totalUsd - costBefore;
+        emitMethodResult(state, methodResult);
         continue;
       }
 
@@ -326,6 +340,7 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
       methodResult.testFile = testFilePath;
       methodResult.status = "written";
       log(state, `  File written: ${testFilePath}`);
+      emitMethodResult(state, methodResult);
 
       // ─── Run ──────────────────────────────────────────
       log(state, `  Running tests...`);
@@ -344,6 +359,7 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
           duration: testResult.duration,
         });
         methodResult.cost = state.cost.totalUsd - costBefore;
+        emitMethodResult(state, methodResult);
         continue;
       }
 
@@ -399,6 +415,7 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
       });
 
       methodResult.cost = state.cost.totalUsd - costBefore;
+      emitMethodResult(state, methodResult);
     }
 
     // ─── Phase: Save & Report ───────────────────────────────
@@ -419,6 +436,24 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
     saveLedger(state, ledgerFacts, ledgerDecisions, ledgerAttempts, durationMs);
     console.log("\n" + formatCostReport(state.cost));
     console.log(`Duration: ${(durationMs / 1000).toFixed(1)}s`);
+
+    emitPipelineEvent("complete", state.runId, {
+      phase: state.phase,
+      service: state.service,
+      totalCost: state.cost.totalUsd,
+      durationMs,
+      totalInputTokens: state.cost.totalInputTokens,
+      totalOutputTokens: state.cost.totalOutputTokens,
+      methods: state.methodResults.map(serializeMethodResult),
+      costByAgent: Object.fromEntries(
+        [...new Map<string, number>(
+          state.cost.steps.reduce((acc, s) => {
+            acc.set(s.agent, (acc.get(s.agent) ?? 0) + s.costUsd);
+            return acc;
+          }, new Map<string, number>()),
+        )],
+      ),
+    });
   }
 }
 
@@ -442,6 +477,33 @@ function selectMethods(state: RunState): string[] {
     default:
       return coverage.uncoveredMethods;
   }
+}
+
+function serializeMethodResult(methodResult: MethodResult) {
+  return {
+    method: methodResult.method,
+    status: methodResult.status,
+    cost: methodResult.cost,
+    attempts: methodResult.attempts,
+    passed: methodResult.result?.passed ?? 0,
+    failed: methodResult.result?.failed ?? 0,
+    testFile: methodResult.testFile,
+    plan: methodResult.plan
+      ? {
+          fileName: methodResult.plan.fileName,
+          totalCases: methodResult.plan.testCases.length + 1,
+          schemaTest: methodResult.plan.schemaTest,
+          testCases: methodResult.plan.testCases,
+        }
+      : null,
+  };
+}
+
+function emitMethodResult(state: RunState, methodResult: MethodResult): void {
+  emitPipelineEvent("method-result", state.runId, {
+    phase: state.phase,
+    method: serializeMethodResult(methodResult),
+  });
 }
 
 function updateMemory(state: RunState): void {
@@ -567,4 +629,10 @@ function printCoverageSummary(state: RunState): void {
 function log(state: RunState, msg: string): void {
   const elapsed = ((Date.now() - new Date(state.startedAt).getTime()) / 1000).toFixed(1);
   console.log(`[${state.runId}] [${elapsed}s] [${state.phase}] ${msg}`);
+  emitPipelineEvent("log", state.runId, {
+    phase: state.phase,
+    message: msg,
+    elapsed: parseFloat(elapsed),
+    cost: state.cost.totalUsd,
+  });
 }

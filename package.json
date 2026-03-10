@@ -6,6 +6,7 @@
   "main": "src/index.ts",
   "scripts": {
     "start": "tsx src/index.ts",
+    "web": "tsx src/server.ts",
     "sync-protos": "tsx src/scripts/sync-protos.ts",
     "eval": "tsx src/scripts/run-eval.ts",
     "build": "tsc --noEmit",
@@ -25,12 +26,14 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
     "dotenv": "^17.3.1",
+    "express": "^4.21.0",
     "glob": "^13.0.6",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@types/express": "^5.0.0",
     "@types/node": "^25.4.0"
   }
 }

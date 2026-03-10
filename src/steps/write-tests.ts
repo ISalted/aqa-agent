@@ -98,6 +98,7 @@ function buildCoderPrompt(
     "",
     "Write the COMPLETE file. Start with imports, end with the last test.",
     "Use read_file tool to check existing files if you need to verify import paths or patterns.",
+    "Use each planned test case ID in the final Playwright test title exactly, e.g. \"UCW-001: ...\".",
     "Output the full TypeScript code.",
   );
 

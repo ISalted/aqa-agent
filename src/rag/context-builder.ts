@@ -185,6 +185,10 @@ Rules:
 - Include at least 1 positive and 1 negative test case
 - Each test must have a clear expectedBehavior
 - Use project naming conventions (camelCase file names)
+- Use a 3-letter uppercase mnemonic ID prefix plus 3-digit numbering for ALL test cases
+- Schema test must be "PREFIX-001", next cases "PREFIX-002", "PREFIX-003", ...
+- Every test name must start with its ID, e.g. "UCW-001: Schema validation for UpdateClientWallet response"
+- Do NOT use titles like "Schema | ...", "Positive | ...", or unnumbered names
 - P1 = must have, P2 = should have, P3 = nice to have
 - Keep plans focused: 5-10 test cases per method`;
 }
@@ -200,6 +204,8 @@ Rules:
 - Each test must be independent — no shared mutable state
 - Use proper error handling with gRPC error types
 - Follow the exact import paths from the example
+- Use the test case IDs from the provided plan exactly as written
+- Every generated test title must start with "{PREFIX}-{NNN}:"
 - Write complete files — never partial code
 
 Output ONLY the complete TypeScript test file content. No explanations.`;

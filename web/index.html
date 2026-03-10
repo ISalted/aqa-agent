@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AQA Agent</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg-0: #060a13;
+      --bg-1: #0b1120;
+      --bg-2: #111827;
+      --bg-3: #1a2332;
+      --border: #1e293b;
+      --text-1: #f1f5f9;
+      --text-2: #cbd5e1;
+      --text-3: #94a3b8;
+      --text-4: #64748b;
+      --accent: #06b6d4;
+      --accent-dim: rgba(6, 182, 212, 0.12);
+      --success: #10b981;
+      --success-dim: rgba(16, 185, 129, 0.12);
+      --error: #ef4444;
+      --error-dim: rgba(239, 68, 68, 0.12);
+      --warning: #f59e0b;
+      --warning-dim: rgba(245, 158, 11, 0.12);
+      --mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --chat-width: 520px;
+      --right-width: 280px;
+      --methods-height: 260px;
+      --history-height: 180px;
+    }
+
+    body {
+      background: var(--bg-0); color: var(--text-2); font-family: var(--sans);
+      font-size: 14px; height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+    }
+
+    .running-bar {
+      position: fixed; top: 0; left: 0; right: 0; height: 2px; z-index: 100;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      background-size: 200% 100%; animation: shimmer 1.5s ease-in-out infinite;
+    }
+    .running-bar.hidden { display: none; }
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 20px; background: var(--bg-1); border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .logo { font-size: 22px; color: var(--accent); }
+    .header-text h1 { font-size: 15px; font-weight: 600; color: var(--text-1); }
+    .header-text .subtitle { font-size: 11px; color: var(--text-4); }
+
+    .badge {
+      font-size: 11px; padding: 3px 10px; border-radius: 10px;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .badge::before { content:''; width:7px; height:7px; border-radius:50%; }
+    .badge.connected { background:var(--success-dim); color:var(--success); }
+    .badge.connected::before { background:var(--success); }
+    .badge.disconnected { background:var(--error-dim); color:var(--error); }
+    .badge.disconnected::before { background:var(--error); }
+    .badge.connecting { background:var(--warning-dim); color:var(--warning); }
+    .badge.connecting::before { background:var(--warning); animation:pulse 1.5s infinite; }
+
+    main {
+      flex: 1; display: grid; grid-template-columns: minmax(420px, 1fr) 8px var(--chat-width) 8px var(--right-width); overflow: hidden;
+    }
+
+    /* ─── Chat sidebar ─── */
+    .sidebar {
+      background: var(--bg-1); border-left: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
+      min-width: 300px;
+    }
+    .panel-resizer {
+      background: var(--bg-0);
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      cursor: col-resize;
+      position: relative;
+    }
+    .panel-resizer::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 2px;
+      height: 44px;
+      border-radius: 2px;
+      background: var(--text-4);
+      opacity: .45;
+    }
+    .section-resizer {
+      height: 8px;
+      background: var(--bg-0);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      cursor: row-resize;
+      position: relative;
+      flex-shrink: 0;
+    }
+    .section-resizer::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 44px;
+      height: 2px;
+      border-radius: 2px;
+      background: var(--text-4);
+      opacity: .45;
+    }
+    .chat-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .chat-header h2 {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .06em; color: var(--text-4);
+    }
+    .btn-clear {
+      font-size: 10px; padding: 2px 8px; background: var(--bg-3); border: none;
+      border-radius: 4px; color: var(--text-4); cursor: pointer;
+    }
+    .btn-clear:hover { color: var(--text-2); }
+
+    .chat-messages {
+      flex: 1; overflow-y: auto; padding: 14px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .chat-msg {
+      max-width: 92%; padding: 9px 13px; border-radius: 12px;
+      font-size: 13px; line-height: 1.55; word-break: break-word;
+      animation: fadeIn .2s ease forwards; opacity: 0;
+    }
+    .chat-msg.user {
+      align-self: flex-end; background: var(--accent-dim); color: var(--text-1);
+      border-bottom-right-radius: 4px;
+    }
+    .chat-msg.agent {
+      align-self: flex-start; background: var(--bg-3); color: var(--text-2);
+      border-bottom-left-radius: 4px;
+    }
+    .chat-msg .welcome-block {
+      margin-top: 10px;
+      padding: 10px 12px;
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    .chat-msg .welcome-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: var(--warning);
+      margin-bottom: 6px;
+    }
+    .chat-msg .welcome-list {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--text-3);
+    }
+    .chat-msg .welcome-list li + li {
+      margin-top: 4px;
+    }
+    .chat-msg.system {
+      align-self: center; background: var(--bg-2); color: var(--text-4);
+      font-size: 11px; border-radius: 6px; padding: 6px 12px;
+    }
+    .chat-msg.thinking {
+      align-self: flex-start; background: var(--bg-3); color: var(--text-4);
+      font-size: 12px; font-style: italic; border-bottom-left-radius: 4px;
+    }
+    .chat-msg .thinking-toggle {
+      display: block; margin-top: 6px; font-size: 11px; color: var(--text-4);
+      cursor: pointer; user-select: none;
+    }
+    .chat-msg .thinking-toggle:hover { color: var(--text-3); }
+    .chat-msg .thinking-content {
+      display: none; margin-top: 4px; padding: 6px 8px;
+      background: var(--bg-2); border-radius: 4px; border-left: 2px solid var(--text-4);
+      font-size: 11px; color: var(--text-4); line-height: 1.5;
+      font-family: var(--sans); white-space: pre-wrap;
+    }
+    .chat-msg .thinking-content.open { display: block; }
+    .chat-msg .intent-badge {
+      display: inline-block; margin-top: 6px; padding: 2px 8px;
+      background: var(--accent-dim); color: var(--accent);
+      border-radius: 4px; font-size: 11px; font-family: var(--mono);
+    }
+    .chat-msg .service-chips {
+      margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px;
+    }
+    .service-chip {
+      padding: 2px 8px; background: var(--bg-2); border: 1px solid var(--border);
+      border-radius: 4px; font-size: 11px; font-family: var(--mono);
+      color: var(--text-3); cursor: pointer; transition: all .15s;
+    }
+    .service-chip:hover { border-color: var(--accent); color: var(--accent); }
+
+    .chat-input-area {
+      padding: 10px 14px; border-top: 1px solid var(--border);
+      display: flex; gap: 8px; flex-shrink: 0; align-items: flex-end;
+    }
+    .chat-input-area textarea {
+      flex: 1; padding: 9px 12px; background: var(--bg-2);
+      border: 1px solid var(--border); border-radius: 10px;
+      color: var(--text-2); font-size: 13px; font-family: var(--sans);
+      resize: none; outline: none; line-height: 1.4; max-height: 100px;
+    }
+    .chat-input-area textarea:focus { border-color: var(--accent); }
+    .btn-send {
+      width: 36px; height: 36px; background: var(--accent); border: none;
+      border-radius: 50%; color: #000; font-size: 18px; font-weight: 700;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: opacity .2s;
+    }
+    .btn-send:hover { opacity: .9; }
+    .btn-send:disabled { opacity: .3; cursor: not-allowed; }
+
+    /* ─── Center: methods + log + history ─── */
+    .content-center {
+      display: flex; flex-direction: column; overflow: hidden; background: var(--bg-0);
+    }
+    .section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; flex-shrink: 0;
+    }
+    .section-header h2 {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .06em; color: var(--text-4);
+    }
+    .count-badge {
+      font-size: 10px; padding: 1px 6px; border-radius: 8px;
+      background: var(--bg-3); color: var(--text-4); font-family: var(--mono);
+    }
+
+    .pipeline-section { flex-shrink: 0; padding: 0 20px 10px; }
+    .pipeline { display: flex; flex-direction: column; gap: 3px; }
+    .pipeline-phase {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px; border-radius: 7px;
+      background: var(--bg-2); border: 1px solid transparent; transition: all .3s ease;
+    }
+    .pipeline-phase.active { background: var(--accent-dim); border-color: var(--accent); }
+    .pipeline-phase.complete { border-color: rgba(16,185,129,.3); }
+    .pipeline-phase.failed { border-color: var(--error); background: var(--error-dim); }
+
+    .phase-icon {
+      width: 22px; height: 22px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; flex-shrink: 0;
+      border: 2px solid var(--border); color: var(--text-4); transition: all .3s;
+    }
+    .pipeline-phase.active .phase-icon { border-color: var(--accent); color: var(--accent); animation: pulse 1.5s infinite; }
+    .pipeline-phase.complete .phase-icon { border-color: var(--success); background: var(--success); color: #000; }
+    .pipeline-phase.failed .phase-icon { border-color: var(--error); background: var(--error); color: #fff; }
+
+    .phase-body { flex: 1; min-width: 0; }
+    .phase-label { font-size: 13px; font-weight: 500; color: var(--text-1); }
+    .phase-detail { font-size: 11px; color: var(--text-4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Log */
+    .log-section {
+      flex: 1; display: flex; flex-direction: column; overflow: hidden;
+      min-height: 120px;
+    }
+    .log-stream {
+      flex: 1; overflow-y: auto; padding: 4px 14px;
+      font-family: var(--mono); font-size: 11.5px; line-height: 1.7;
+    }
+    .log-entry { display: flex; gap: 6px; animation: fadeIn .15s ease forwards; opacity: 0; }
+    .log-time { color: var(--text-4); flex-shrink: 0; min-width: 36px; text-align: right; }
+    .log-phase { font-weight: 600; flex-shrink: 0; min-width: 68px; }
+    .log-msg { color: var(--text-3); word-break: break-word; }
+
+    .log-phase[data-p="resolve"]   { color: #818cf8; }
+    .log-phase[data-p="parse"]     { color: #a78bfa; }
+    .log-phase[data-p="coverage"]  { color: #c084fc; }
+    .log-phase[data-p="plan"]      { color: var(--accent); }
+    .log-phase[data-p="implement"] { color: #2dd4bf; }
+    .log-phase[data-p="validate"]  { color: var(--success); }
+    .log-phase[data-p="debug"]     { color: var(--warning); }
+    .log-phase[data-p="save"]      { color: var(--text-4); }
+    .log-phase[data-p="report"]    { color: var(--text-4); }
+    .log-phase[data-p="done"]      { color: var(--success); }
+    .log-phase[data-p="failed"]    { color: var(--error); }
+    .log-phase[data-p="init"]      { color: var(--text-4); }
+    .log-phase[data-p="error"]     { color: var(--error); }
+
+    /* History */
+    .history-section {
+      flex: 0 0 var(--history-height); overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    .history-list { flex: 1; overflow-y: auto; padding: 4px 14px; }
+    .history-entry {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 10px; border-radius: 5px; margin-bottom: 3px;
+      background: var(--bg-2); font-size: 12px; cursor: default; transition: background .15s;
+    }
+    .history-entry:hover { background: var(--bg-3); }
+    .history-id { font-family: var(--mono); color: var(--accent); min-width: 64px; }
+    .history-service { color: var(--text-2); flex: 1; }
+    .history-action { font-size: 10px; padding: 1px 5px; border-radius: 3px; background: var(--bg-3); color: var(--text-3); }
+    .history-cost { font-family: var(--mono); color: var(--text-4); min-width: 56px; text-align: right; }
+    .history-time { color: var(--text-4); min-width: 32px; text-align: right; }
+
+    /* ─── Right sidebar ─── */
+    .content-sidebar {
+      background: var(--bg-1); border-left: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .cost-section { padding: 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .cost-total { font-size: 32px; font-weight: 700; color: var(--text-1); font-family: var(--mono); margin-top: 4px; }
+    .cost-label { font-size: 10px; color: var(--text-4); text-transform: uppercase; margin-bottom: 10px; }
+    .token-total { font-size: 18px; font-weight: 600; color: var(--text-2); font-family: var(--mono); margin-top: 10px; }
+    .token-label { font-size: 10px; color: var(--text-4); text-transform: uppercase; margin-top: 2px; }
+    .cost-breakdown { margin-top: 6px; }
+    .cost-row { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; font-size: 11px; }
+    .cost-agent { color: var(--text-3); }
+    .cost-val { font-family: var(--mono); color: var(--text-4); }
+    .cost-bar-bg { height: 3px; background: var(--bg-3); border-radius: 2px; margin-top: 1px; }
+    .cost-bar { height: 100%; background: var(--accent); border-radius: 2px; transition: width .5s ease; }
+
+    .methods-section { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .methods-list { flex: 1; overflow-y: auto; padding: 4px 14px; }
+    .method-card {
+      display: flex; align-items: flex-start; gap: 8px;
+      padding: 7px 10px; background: var(--bg-2); border-radius: 5px;
+      margin-bottom: 3px; border: 1px solid var(--border);
+    }
+    .method-card.passed { border-color: rgba(16,185,129,.3); }
+    .method-card.failed { border-color: rgba(239,68,68,.3); }
+    .method-status { width: 18px; text-align: center; flex-shrink: 0; font-size: 13px; }
+    .method-body { flex: 1; min-width: 0; }
+    .method-name { flex: 1; font-size: 12px; font-family: var(--mono); color: var(--text-2); }
+    .method-meta { font-size: 10px; color: var(--text-4); font-family: var(--mono); text-align: right; }
+    .method-plan {
+      margin-top: 6px; padding: 6px 8px; background: var(--bg-3);
+      border-radius: 4px; font-size: 11px; color: var(--text-3);
+    }
+    .method-plan summary {
+      cursor: pointer; color: var(--accent); user-select: none;
+      list-style: none;
+    }
+    .method-plan summary::-webkit-details-marker { display: none; }
+    .plan-file { margin-top: 6px; color: var(--text-4); font-family: var(--mono); }
+    .plan-case { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
+    .plan-case:first-of-type { border-top: none; padding-top: 2px; }
+    .plan-case-title { color: var(--text-2); }
+    .plan-case-meta { color: var(--text-4); font-family: var(--mono); font-size: 10px; }
+
+    .content-center .methods-section {
+      flex: 0 0 var(--methods-height);
+      min-height: 140px;
+    }
+    .content-sidebar .pipeline-section {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 14px 10px;
+      border-top: 1px solid var(--border);
+    }
+
+    footer {
+      padding: 6px 20px; background: var(--bg-1); border-top: 1px solid var(--border);
+      font-size: 11px; color: var(--text-4); display: flex; justify-content: space-between; flex-shrink: 0;
+    }
+
+    .empty-state { text-align: center; padding: 24px; color: var(--text-4); font-size: 12px; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(3px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div id="runningBar" class="running-bar hidden"></div>
+
+  <header>
+    <div class="header-left">
+      <span class="logo">⬡</span>
+      <div class="header-text">
+        <h1>AQA Agent</h1>
+        <span class="subtitle">Test Automation Engine</span>
+      </div>
+    </div>
+    <span id="connStatus" class="badge connecting">connecting</span>
+  </header>
+
+  <main>
+    <!-- Left: methods + log + history -->
+    <div class="content-center">
+      <div class="methods-section">
+        <div class="section-header">
+          <h2>Methods</h2>
+          <span id="methodCount" class="count-badge">0</span>
+        </div>
+        <div id="methodsList" class="methods-list"><div class="empty-state">No active run</div></div>
+      </div>
+
+      <div id="methodsResizer" class="section-resizer" aria-label="Resize methods and log"></div>
+
+      <div class="log-section">
+        <div class="section-header">
+          <h2>Live Log</h2>
+          <span id="logCount" class="count-badge">0</span>
+        </div>
+        <div id="logStream" class="log-stream"></div>
+      </div>
+
+      <div id="historyResizer" class="section-resizer" aria-label="Resize log and history"></div>
+
+      <div class="history-section">
+        <div class="section-header">
+          <h2>Run History</h2>
+          <span id="historyCount" class="count-badge">0</span>
+        </div>
+        <div id="historyList" class="history-list"><div class="empty-state">Loading...</div></div>
+      </div>
+    </div>
+
+    <div id="panelResizer" class="panel-resizer" aria-label="Resize panels"></div>
+
+    <!-- Middle: chat -->
+    <aside class="sidebar">
+      <div class="chat-header">
+        <h2>Chat</h2>
+        <button class="btn-clear" onclick="clearChat()">Clear</button>
+      </div>
+      <div class="chat-messages" id="chatMessages"></div>
+      <div class="chat-input-area">
+        <textarea id="chatInput" rows="2" placeholder="Напиши тести для ClientWallets..."></textarea>
+        <button class="btn-send" id="sendBtn" onclick="sendMessage()">↑</button>
+      </div>
+    </aside>
+
+    <div id="rightPanelResizer" class="panel-resizer" aria-label="Resize chat and cost"></div>
+
+    <!-- Right: cost + methods -->
+    <div class="content-sidebar">
+      <div class="cost-section">
+        <div class="section-header" style="padding:0 0 6px"><h2>Cost</h2></div>
+        <div class="cost-total" id="costTotal">$0.0000</div>
+        <div class="cost-label">total USD</div>
+        <div class="token-total" id="tokenTotal">0</div>
+        <div class="token-label">total tokens</div>
+        <div id="costBreakdown" class="cost-breakdown"></div>
+      </div>
+      <div class="pipeline-section">
+        <div class="section-header">
+          <h2>Pipeline</h2>
+          <span id="pipelineStatus" class="count-badge">idle</span>
+        </div>
+        <div class="pipeline" id="pipeline">
+          <div class="pipeline-phase" data-phase="resolve"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Resolve</div><div class="phase-detail">Find service infrastructure</div></div></div>
+          <div class="pipeline-phase" data-phase="parse"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Parse</div><div class="phase-detail">Parse proto contract</div></div></div>
+          <div class="pipeline-phase" data-phase="coverage"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Coverage</div><div class="phase-detail">Analyze test coverage</div></div></div>
+          <div class="pipeline-phase" data-phase="plan"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Plan</div><div class="phase-detail">Generate test plans</div></div></div>
+          <div class="pipeline-phase" data-phase="implement"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Implement</div><div class="phase-detail">Write test code</div></div></div>
+          <div class="pipeline-phase" data-phase="validate"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Validate</div><div class="phase-detail">Run tests</div></div></div>
+          <div class="pipeline-phase" data-phase="debug"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Debug</div><div class="phase-detail">Fix failures</div></div></div>
+          <div class="pipeline-phase" data-phase="done"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Complete</div><div class="phase-detail">Pipeline finished</div></div></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <span id="footerLeft">Ready</span>
+    <span id="footerRight"></span>
+  </footer>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    const PHASE_DEFAULTS = {
+      resolve:'Find service infrastructure', parse:'Parse proto contract',
+      coverage:'Analyze test coverage', plan:'Generate test plans',
+      implement:'Write test code', validate:'Run tests',
+      debug:'Fix failures', done:'Pipeline finished',
+    };
+
+    let activePhase = null;
+    let completedPhases = new Set();
+    let logCount = 0;
+    let services = [];
+    const CHAT_STORAGE_KEY = 'aqa-agent-chat-v1';
+    const CHAT_BOOT_KEY = 'aqa-agent-chat-boot-id';
+    const DASHBOARD_STORAGE_KEY = 'aqa-agent-dashboard-v1';
+    const LAYOUT_STORAGE_KEY = 'aqa-agent-layout-v1';
+
+    // ─── SSE ──────────────────────────────────────────────
+
+    function connectSSE() {
+      const es = new EventSource('/api/stream');
+      es.onopen = () => { $('connStatus').textContent='connected'; $('connStatus').className='badge connected'; };
+      es.onerror = () => { $('connStatus').textContent='disconnected'; $('connStatus').className='badge disconnected'; };
+      es.onmessage = (e) => {
+        const ev = JSON.parse(e.data);
+        if (ev.type === 'connected') return;
+        handleEvent(ev);
+      };
+    }
+
+    function handleEvent(ev) {
+      switch (ev.type) {
+        case 'started':  onStarted(ev); break;
+        case 'log':      onLog(ev); break;
+        case 'method-result': onMethodResult(ev); break;
+        case 'complete': onComplete(ev); break;
+        case 'error':    onError(ev); break;
+      }
+    }
+
+    function onStarted(ev) {
+      $('runningBar').classList.remove('hidden');
+      $('pipelineStatus').textContent = ev.data.action + ' ' + ev.data.service;
+      $('footerLeft').textContent = `Running: ${ev.data.service}`;
+      $('footerRight').textContent = '';
+      activePhase = null; completedPhases.clear(); logCount = 0;
+      resetPipeline();
+      $('logStream').innerHTML = '';
+      $('logCount').textContent = '0';
+      $('costTotal').textContent = '$0.0000';
+      $('tokenTotal').textContent = '0';
+      $('costBreakdown').innerHTML = '';
+      $('methodsList').innerHTML = '<div class="empty-state">Running pipeline...</div>';
+      $('methodCount').textContent = '0';
+      saveDashboardState({ methods: [], costByAgent: null });
+    }
+
+    function onLog(ev) {
+      const { phase, message, elapsed, cost } = ev.data;
+      if (phase !== activePhase && phase !== 'init' && phase !== 'save' && phase !== 'report') {
+        if (activePhase) markPhase(activePhase, 'complete');
+        activePhase = phase;
+        if (phase !== 'done' && phase !== 'failed') markPhase(phase, 'active');
+      }
+      if (cost !== undefined && cost !== null) $('costTotal').textContent = '$' + cost.toFixed(4);
+      appendLog(elapsed, phase, message);
+      updatePhaseDetail(phase, message);
+      saveDashboardState();
+    }
+
+    function onMethodResult(ev) {
+      const method = ev.data.method;
+      if (!method) return;
+
+      const current = loadDashboardState();
+      const methods = Array.isArray(current.methods) ? current.methods : [];
+      const idx = methods.findIndex(m => m.method === method.method);
+      if (idx >= 0) methods[idx] = method;
+      else methods.push(method);
+
+      renderMethods(methods);
+      saveDashboardState({ methods });
+    }
+
+    function onComplete(ev) {
+      $('runningBar').classList.add('hidden');
+      enableInput();
+      if (activePhase && activePhase !== 'done' && activePhase !== 'failed') markPhase(activePhase, 'complete');
+      const phase = ev.data.phase;
+      if (phase === 'done') {
+        markPhase('done', 'complete'); $('pipelineStatus').textContent = 'done';
+        $('footerLeft').textContent = `Completed: ${ev.data.service} — $${(ev.data.totalCost??0).toFixed(4)}`;
+        addChatMsg('agent', `Done! ${ev.data.service} pipeline finished. Cost: $${(ev.data.totalCost??0).toFixed(4)}`);
+      } else if (phase === 'failed') {
+        markPhase(activePhase||'done', 'failed'); $('pipelineStatus').textContent = 'failed';
+        $('footerLeft').textContent = 'Pipeline failed';
+        addChatMsg('agent', 'Pipeline failed. Check the log for details.');
+      }
+      if (ev.data.totalCost !== undefined) $('costTotal').textContent = '$' + ev.data.totalCost.toFixed(4);
+      if (ev.data.methods) renderMethods(ev.data.methods);
+      if (ev.data.costByAgent) renderCostBreakdown(ev.data.costByAgent, ev.data.totalCost);
+      const tokens = (ev.data.totalInputTokens||0) + (ev.data.totalOutputTokens||0);
+      $('tokenTotal').textContent = String(tokens);
+      $('footerRight').textContent = `${((ev.data.durationMs||0)/1000).toFixed(1)}s · ${(tokens/1000).toFixed(1)}K tokens`;
+      fetchHistory();
+      activePhase = null;
+      saveDashboardState({
+        methods: ev.data.methods || [],
+        costByAgent: ev.data.costByAgent || null,
+        tokenTotal: String(tokens),
+      });
+    }
+
+    function onError(ev) {
+      $('runningBar').classList.add('hidden');
+      enableInput();
+      $('pipelineStatus').textContent = 'error';
+      $('footerLeft').textContent = 'Error';
+      appendLog('0.0', 'error', ev.data.message || 'Unknown error');
+      addChatMsg('agent', 'Error: ' + (ev.data.message || 'Unknown error'));
+      saveDashboardState();
+    }
+
+    // ─── Pipeline ─────────────────────────────────────────
+
+    function resetPipeline() {
+      document.querySelectorAll('.pipeline-phase').forEach(el => {
+        el.className = 'pipeline-phase';
+        el.querySelector('.phase-icon').textContent = '○';
+        el.querySelector('.phase-detail').textContent = PHASE_DEFAULTS[el.dataset.phase] || '';
+      });
+    }
+
+    function markPhase(p, s) {
+      const el = document.querySelector(`.pipeline-phase[data-phase="${p}"]`);
+      if (!el) return;
+      el.className = 'pipeline-phase ' + s;
+      const icon = el.querySelector('.phase-icon');
+      if (s === 'complete') { icon.textContent = '✓'; completedPhases.add(p); }
+      else if (s === 'failed') icon.textContent = '✗';
+      else if (s === 'active') icon.textContent = '●';
+    }
+
+    function updatePhaseDetail(p, msg) {
+      const el = document.querySelector(`.pipeline-phase[data-phase="${p}"] .phase-detail`);
+      if (el) el.textContent = msg.replace(/^\s+/, '').substring(0, 80);
+    }
+
+    function appendLog(elapsed, phase, message) {
+      const s = $('logStream');
+      const d = document.createElement('div');
+      d.className = 'log-entry';
+      d.innerHTML = `<span class="log-time">${elapsed}s</span><span class="log-phase" data-p="${esc(phase)}">${esc(phase)}</span><span class="log-msg">${esc(message)}</span>`;
+      s.appendChild(d);
+      s.scrollTop = s.scrollHeight;
+      logCount++;
+      $('logCount').textContent = logCount;
+    }
+
+    function loadDashboardState() {
+      try {
+        const raw = localStorage.getItem(DASHBOARD_STORAGE_KEY);
+        return raw ? JSON.parse(raw) : null;
+      } catch {
+        return null;
+      }
+    }
+
+    function clearSavedDashboard() {
+      localStorage.removeItem(DASHBOARD_STORAGE_KEY);
+    }
+
+    function loadLayoutState() {
+      try {
+        const raw = localStorage.getItem(LAYOUT_STORAGE_KEY);
+        return raw ? JSON.parse(raw) : null;
+      } catch {
+        return null;
+      }
+    }
+
+    function saveLayoutState(state) {
+      const prev = loadLayoutState() || {};
+      localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify({ ...prev, ...state }));
+    }
+
+    function saveDashboardState(overrides = {}) {
+      const prev = loadDashboardState() || {};
+      const next = {
+        ...prev,
+        ...overrides,
+        activePhase,
+        completedPhases: [...completedPhases],
+        logCount,
+        runningBarHidden: $('runningBar').classList.contains('hidden'),
+        pipelineStatus: $('pipelineStatus').textContent,
+        pipelineHtml: $('pipeline').innerHTML,
+        logHtml: $('logStream').innerHTML,
+        costTotal: $('costTotal').textContent,
+        tokenTotal: $('tokenTotal').textContent,
+        costBreakdownHtml: $('costBreakdown').innerHTML,
+        methodsHtml: $('methodsList').innerHTML,
+        methodCount: $('methodCount').textContent,
+        footerLeft: $('footerLeft').textContent,
+        footerRight: $('footerRight').textContent,
+      };
+      localStorage.setItem(DASHBOARD_STORAGE_KEY, JSON.stringify(next));
+    }
+
+    function restoreDashboard() {
+      const state = loadDashboardState();
+      if (!state) return;
+
+      activePhase = state.activePhase || null;
+      completedPhases = new Set(state.completedPhases || []);
+      logCount = state.logCount || 0;
+
+      $('runningBar').classList.toggle('hidden', state.runningBarHidden !== false);
+      $('pipelineStatus').textContent = state.pipelineStatus || 'idle';
+      if (state.pipelineHtml) $('pipeline').innerHTML = state.pipelineHtml;
+      if (state.logHtml) $('logStream').innerHTML = state.logHtml;
+      $('logCount').textContent = String(logCount);
+      if (state.costTotal) $('costTotal').textContent = state.costTotal;
+      if (state.tokenTotal) $('tokenTotal').textContent = state.tokenTotal;
+      if (state.costBreakdownHtml !== undefined) $('costBreakdown').innerHTML = state.costBreakdownHtml;
+      if (state.methodsHtml) $('methodsList').innerHTML = state.methodsHtml;
+      if (state.methodCount) $('methodCount').textContent = state.methodCount;
+      if (state.footerLeft) $('footerLeft').textContent = state.footerLeft;
+      if (state.footerRight) $('footerRight').textContent = state.footerRight;
+    }
+
+    function applyChatWidth(widthPx) {
+      document.documentElement.style.setProperty('--chat-width', `${widthPx}px`);
+      saveLayoutState({ chatWidth: widthPx });
+    }
+
+    function applyRightWidth(widthPx) {
+      document.documentElement.style.setProperty('--right-width', `${widthPx}px`);
+      saveLayoutState({ rightWidth: widthPx });
+    }
+
+    function applyMethodsHeight(heightPx) {
+      document.documentElement.style.setProperty('--methods-height', `${heightPx}px`);
+      saveLayoutState({ methodsHeight: heightPx });
+    }
+
+    function applyHistoryHeight(heightPx) {
+      document.documentElement.style.setProperty('--history-height', `${heightPx}px`);
+      saveLayoutState({ historyHeight: heightPx });
+    }
+
+    function getDefaultChatWidth() {
+      const main = document.querySelector('main');
+      const rightSidebar = document.querySelector('.content-sidebar');
+      if (!main || !rightSidebar) return 520;
+
+      const rect = main.getBoundingClientRect();
+      const rightWidth = rightSidebar.getBoundingClientRect().width;
+      const available = rect.width - rightWidth - 8;
+      const maxChat = Math.max(360, available - 440);
+      const preferred = Math.floor(available * 0.5);
+      return Math.max(360, Math.min(maxChat, preferred));
+    }
+
+    function initPanelResizers() {
+      const leftResizer = $('panelResizer');
+      const rightResizer = $('rightPanelResizer');
+      const main = document.querySelector('main');
+      const rightSidebar = document.querySelector('.content-sidebar');
+      const chatSidebar = document.querySelector('.sidebar');
+      const saved = loadLayoutState();
+      if (saved?.chatWidth) applyChatWidth(saved.chatWidth);
+      else applyChatWidth(getDefaultChatWidth());
+      if (saved?.rightWidth) applyRightWidth(saved.rightWidth);
+
+      let dragging = null;
+
+      const onMove = (e) => {
+        if (!dragging) return;
+        const rect = main.getBoundingClientRect();
+        const rightWidth = rightSidebar.getBoundingClientRect().width;
+        const chatWidth = chatSidebar.getBoundingClientRect().width;
+        if (dragging === 'left') {
+          const maxChat = Math.max(320, rect.width - rightWidth - 480 - 8);
+          const nextWidth = Math.max(320, Math.min(maxChat, rect.right - rightWidth - 8 - e.clientX - 4));
+          applyChatWidth(nextWidth);
+        } else if (dragging === 'right') {
+          const maxRight = Math.max(240, rect.width - chatWidth - 440 - 8 - 8);
+          const nextWidth = Math.max(240, Math.min(maxRight, rect.right - e.clientX));
+          applyRightWidth(nextWidth);
+        }
+      };
+
+      leftResizer.addEventListener('mousedown', () => {
+        dragging = 'left';
+        document.body.style.userSelect = 'none';
+      });
+
+      rightResizer.addEventListener('mousedown', () => {
+        dragging = 'right';
+        document.body.style.userSelect = 'none';
+      });
+
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', () => {
+        dragging = null;
+        document.body.style.userSelect = '';
+      });
+    }
+
+    function initSectionResizers() {
+      const center = document.querySelector('.content-center');
+      const methodsResizer = $('methodsResizer');
+      const historyResizer = $('historyResizer');
+      const saved = loadLayoutState();
+      if (saved?.methodsHeight) applyMethodsHeight(saved.methodsHeight);
+      if (saved?.historyHeight) applyHistoryHeight(saved.historyHeight);
+
+      let dragging = null;
+
+      const onMove = (e) => {
+        if (!dragging) return;
+        const rect = center.getBoundingClientRect();
+        const methodsMin = 140;
+        const historyMin = 110;
+        const logMin = 120;
+        const methodsHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--methods-height')) || 260;
+        const historyHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--history-height')) || 180;
+
+        if (dragging === 'methods') {
+          const maxMethods = rect.height - historyHeight - logMin - 16;
+          const nextHeight = Math.max(methodsMin, Math.min(maxMethods, e.clientY - rect.top));
+          applyMethodsHeight(nextHeight);
+        } else if (dragging === 'history') {
+          const maxHistory = rect.height - methodsHeight - logMin - 16;
+          const nextHeight = Math.max(historyMin, Math.min(maxHistory, rect.bottom - e.clientY));
+          applyHistoryHeight(nextHeight);
+        }
+      };
+
+      methodsResizer.addEventListener('mousedown', () => {
+        dragging = 'methods';
+        document.body.style.userSelect = 'none';
+      });
+
+      historyResizer.addEventListener('mousedown', () => {
+        dragging = 'history';
+        document.body.style.userSelect = 'none';
+      });
+
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', () => {
+        dragging = null;
+        document.body.style.userSelect = '';
+      });
+    }
+
+    // ─── Chat ─────────────────────────────────────────────
+
+    let thinkingCounter = 0;
+
+    function loadSavedChat() {
+      try {
+        const raw = localStorage.getItem(CHAT_STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveChat(messages) {
+      localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages));
+    }
+
+    function clearSavedChat() {
+      localStorage.removeItem(CHAT_STORAGE_KEY);
+    }
+
+    function persistChatMsg(role, text, extra, thinking) {
+      const messages = loadSavedChat();
+      messages.push({ role, text, extra: extra || null, thinking: thinking || null });
+      saveChat(messages);
+    }
+
+    function addChatMsg(role, text, extra, thinking, persist = true) {
+      const el = $('chatMessages');
+      const d = document.createElement('div');
+      d.className = 'chat-msg ' + role;
+      let html = esc(text).replace(/\n/g, '<br>');
+      if (thinking) {
+        const id = 'thinking-' + (thinkingCounter++);
+        html += `<span class="thinking-toggle" onclick="document.getElementById('${id}').classList.toggle('open')">▸ thinking</span>`;
+        html += `<div class="thinking-content" id="${id}">${esc(thinking)}</div>`;
+      }
+      html += (extra || '');
+      d.innerHTML = html;
+      el.appendChild(d);
+      el.scrollTop = el.scrollHeight;
+      if (persist) persistChatMsg(role, text, extra, thinking);
+    }
+
+    function addThinking() {
+      const el = $('chatMessages');
+      const d = document.createElement('div');
+      d.className = 'chat-msg thinking';
+      d.id = 'thinkingMsg';
+      d.textContent = 'Thinking...';
+      el.appendChild(d);
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function removeThinking() {
+      const el = $('thinkingMsg');
+      if (el) el.remove();
+    }
+
+    async function sendMessage() {
+      const input = $('chatInput');
+      const msg = input.value.trim();
+      if (!msg) return;
+
+      addChatMsg('user', msg);
+      input.value = '';
+      disableInput();
+      addThinking();
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: msg }),
+        });
+
+        removeThinking();
+        const data = await res.json();
+
+        if (!res.ok) {
+          addChatMsg('agent', data.error || 'Something went wrong');
+          enableInput();
+          return;
+        }
+
+        if (data.type === 'pipeline' && data.intent) {
+          const i = data.intent;
+          const badge = `<span class="intent-badge">${i.action} ${i.service}${i.methods ? ' ['+i.methods.join(', ')+']' : ''}</span>`;
+          addChatMsg('agent', data.text, badge, data.thinking);
+        } else {
+          addChatMsg('agent', data.text, null, data.thinking);
+          enableInput();
+        }
+      } catch (e) {
+        removeThinking();
+        addChatMsg('agent', 'Connection error: ' + e.message);
+        enableInput();
+      }
+    }
+
+    function disableInput() {
+      $('sendBtn').disabled = true;
+      $('chatInput').disabled = true;
+    }
+
+    function enableInput() {
+      $('sendBtn').disabled = false;
+      $('chatInput').disabled = false;
+      $('chatInput').focus();
+    }
+
+    async function clearChat() {
+      $('chatMessages').innerHTML = '';
+      clearSavedChat();
+      await fetch('/api/chat/clear', { method: 'POST' });
+      showWelcome();
+    }
+
+    async function syncChatSession() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        const currentBootId = data.bootId || null;
+        const savedBootId = localStorage.getItem(CHAT_BOOT_KEY);
+
+        if (currentBootId && savedBootId !== currentBootId) {
+          clearSavedChat();
+          clearSavedDashboard();
+          localStorage.setItem(CHAT_BOOT_KEY, currentBootId);
+        }
+      } catch {
+        // Keep existing local chat if server status is unavailable.
+      }
+    }
+
+    $('chatInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    // ─── Methods / Cost / History ─────────────────────────
+
+    function renderMethods(methods) {
+      const el = $('methodsList');
+      if (!methods?.length) { el.innerHTML = '<div class="empty-state">No methods</div>'; $('methodCount').textContent='0'; return; }
+      $('methodCount').textContent = methods.length;
+      el.innerHTML = methods.map(m => {
+        const icon = m.status==='passed'?'✅':m.status==='failed'?'❌':m.status==='planned'?'📋':m.status==='skipped'?'⏭':'⬜';
+        const cls = m.status==='passed'?' passed':m.status==='failed'?' failed':'';
+        const cost = m.cost ? '$'+m.cost.toFixed(4) : '—';
+        const att = m.attempts > 1 ? ` (${m.attempts}x)` : '';
+        const plan = m.plan
+          ? `<details class="method-plan"><summary>Plan: ${m.plan.totalCases} test cases</summary>` +
+            `<div class="plan-file">${esc(m.plan.fileName || '')}</div>` +
+            renderPlanCase(m.plan.schemaTest, true) +
+            (m.plan.testCases || []).map(tc => renderPlanCase(tc, false)).join('') +
+            `</details>`
+          : '';
+        return `<div class="method-card${cls}">` +
+          `<span class="method-status">${icon}</span>` +
+          `<div class="method-body"><div class="method-name">${esc(m.method)}</div>${plan}</div>` +
+          `<span class="method-meta">${cost}${att}</span></div>`;
+      }).join('');
+    }
+
+    function renderPlanCase(testCase, isSchema) {
+      if (!testCase) return '';
+      const type = isSchema ? 'schema' : (testCase.type || 'case');
+      return `<div class="plan-case">` +
+        `<div class="plan-case-title">${esc(testCase.name || 'Unnamed case')}</div>` +
+        `<div class="plan-case-meta">${esc(type)} · ${esc(testCase.priority || 'P?')}</div>` +
+        `<div>${esc(testCase.description || '')}</div>` +
+        `</div>`;
+    }
+
+    function renderCostBreakdown(byAgent, total) {
+      const el = $('costBreakdown');
+      if (!byAgent || !total) { el.innerHTML = ''; return; }
+      el.innerHTML = Object.entries(byAgent).sort((a,b)=>b[1]-a[1]).map(([agent, cost]) => {
+        const pct = total > 0 ? (cost/total*100) : 0;
+        return `<div class="cost-row"><span class="cost-agent">${esc(agent)}</span><span class="cost-val">$${cost.toFixed(4)} (${pct.toFixed(0)}%)</span></div><div class="cost-bar-bg"><div class="cost-bar" style="width:${pct}%"></div></div>`;
+      }).join('');
+    }
+
+    async function fetchHistory() {
+      try {
+        const res = await fetch('/api/history');
+        const h = await res.json();
+        $('historyCount').textContent = h.length;
+        if (!h.length) { $('historyList').innerHTML = '<div class="empty-state">No runs yet</div>'; return; }
+        $('historyList').innerHTML = h.slice(0,20).map(r => {
+          const dur = (r.durationMs/1000).toFixed(0);
+          return `<div class="history-entry"><span class="history-id">${esc(r.runId)}</span><span class="history-service">${esc(r.service)}</span><span class="history-action">${r.action}</span><span class="history-cost">$${r.totalCostUsd.toFixed(4)}</span><span class="history-time">${dur}s</span></div>`;
+        }).join('');
+      } catch {}
+    }
+
+    async function fetchServices() {
+      try {
+        const res = await fetch('/api/services');
+        const data = await res.json();
+        services = data.services || [];
+      } catch {}
+    }
+
+    // ─── Welcome ──────────────────────────────────────────
+
+    function showWelcome() {
+      const chips = services.map(s =>
+        `<span class="service-chip" onclick="quickSend('cover ${s}')">${s}</span>`
+      ).join('');
+      const reminders = `
+        <div class="welcome-block">
+          <div class="welcome-title">Before Run Check</div>
+          <ul class="welcome-list">
+            <li>You still need to define requirements source.</li>
+            <li>You still need business-vs-contract priority policy.</li>
+            <li>You still need conflict / assumptions policy.</li>
+            <li>Proto and generated types sync are automatic now.</li>
+          </ul>
+        </div>
+      `;
+      addChatMsg('agent',
+        'Hello! I\'m your QA testing assistant. Tell me what to test — for example:\n' +
+        '• "Покрий тестами ClientWallets"\n' +
+        '• "Проаналізуй XpEngine"\n' +
+        '• "Plan tests for BrokerSettings"',
+        reminders + (services.length ? '<div class="service-chips">' + chips + '</div>' : ''),
+        null,
+        false
+      );
+    }
+
+    function restoreChat() {
+      const messages = loadSavedChat();
+      if (!messages.length) {
+        showWelcome();
+        return;
+      }
+
+      $('chatMessages').innerHTML = '';
+      for (const message of messages) {
+        addChatMsg(
+          message.role || 'agent',
+          message.text || '',
+          message.extra || null,
+          message.thinking || null,
+          false
+        );
+      }
+    }
+
+    function quickSend(text) {
+      $('chatInput').value = text;
+      sendMessage();
+    }
+
+    function esc(s) {
+      if (!s) return '';
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // ─── Init ─────────────────────────────────────────────
+
+    async function initApp() {
+      initPanelResizers();
+      initSectionResizers();
+      connectSSE();
+      await syncChatSession();
+      restoreDashboard();
+      await fetchServices();
+      restoreChat();
+      fetchHistory();
+    }
+
+    initApp();
+  </script>
+</body>
+</html>
