@@ -224,7 +224,7 @@ export interface MethodResult {
   failures: ClassifiedFailure[];
   attempts: number;
   cost: number;
-  status: "pending" | "planned" | "written" | "passed" | "failed" | "skipped";
+  status: "pending" | "analyzed" | "planned" | "written" | "passed" | "failed" | "skipped";
 }
 
 export interface ParsedIntent {
@@ -268,6 +268,49 @@ export interface BudgetLimits {
 export interface ProjectIndex {
   services: Record<string, ServiceIndex>;
   lastUpdated: string;
+}
+
+export interface ProtoSnapshotsStore {
+  services: Record<string, ProtoServiceSnapshot>;
+  lastUpdated: string;
+}
+
+export interface ProtoServiceSnapshot {
+  service: string;
+  protoFile: string;
+  fileHash: string;
+  methods: ProtoMethodSnapshot[];
+  messages: ProtoMessageSnapshot[];
+  capturedAt: string;
+}
+
+export interface ProtoMethodSnapshot {
+  name: string;
+  inputType: string;
+  outputType: string;
+  signature: string;
+}
+
+export interface ProtoMessageSnapshot {
+  name: string;
+  signature: string;
+}
+
+export interface ProtoChangeServiceReport {
+  service: string;
+  protoFile: string;
+  status: "added" | "removed" | "updated";
+  addedMethods: string[];
+  removedMethods: string[];
+  changedMethods: string[];
+  changedMessages: string[];
+}
+
+export interface ProtoChangeReport {
+  syncedAt: string;
+  hasChanges: boolean;
+  changedFiles: string[];
+  changedServices: ProtoChangeServiceReport[];
 }
 
 export interface ServiceIndex {

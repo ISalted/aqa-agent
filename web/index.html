@@ -338,11 +338,13 @@
       padding: 7px 10px; background: var(--bg-2); border-radius: 5px;
       margin-bottom: 3px; border: 1px solid var(--border);
     }
+    .method-card.analyzed { border-color: rgba(6,182,212,.3); }
     .method-card.passed { border-color: rgba(16,185,129,.3); }
     .method-card.failed { border-color: rgba(239,68,68,.3); }
     .method-status { width: 18px; text-align: center; flex-shrink: 0; font-size: 13px; }
     .method-body { flex: 1; min-width: 0; }
     .method-name { flex: 1; font-size: 12px; font-family: var(--mono); color: var(--text-2); }
+    .method-note { margin-top: 2px; font-size: 10px; color: var(--text-4); }
     .method-meta { font-size: 10px; color: var(--text-4); font-family: var(--mono); text-align: right; }
     .method-plan {
       margin-top: 6px; padding: 6px 8px; background: var(--bg-3);
@@ -494,6 +496,7 @@
     let completedPhases = new Set();
     let logCount = 0;
     let services = [];
+    let protoSyncReport = null;
     const CHAT_STORAGE_KEY = 'aqa-agent-chat-v1';
     const CHAT_BOOT_KEY = 'aqa-agent-chat-boot-id';
     const DASHBOARD_STORAGE_KEY = 'aqa-agent-dashboard-v1';
@@ -571,10 +574,11 @@
       enableInput();
       if (activePhase && activePhase !== 'done' && activePhase !== 'failed') markPhase(activePhase, 'complete');
       const phase = ev.data.phase;
+      const summary = ev.data.summary || null;
       if (phase === 'done') {
         markPhase('done', 'complete'); $('pipelineStatus').textContent = 'done';
         $('footerLeft').textContent = `Completed: ${ev.data.service} — $${(ev.data.totalCost??0).toFixed(4)}`;
-        addChatMsg('agent', `Done! ${ev.data.service} pipeline finished. Cost: $${(ev.data.totalCost??0).toFixed(4)}`);
+        addChatMsg('agent', formatCompletionMessage(ev.data.service, ev.data.action, summary, ev.data.totalCost ?? 0));
       } else if (phase === 'failed') {
         markPhase(activePhase||'done', 'failed'); $('pipelineStatus').textContent = 'failed';
         $('footerLeft').textContent = 'Pipeline failed';
@@ -989,10 +993,11 @@
       if (!methods?.length) { el.innerHTML = '<div class="empty-state">No methods</div>'; $('methodCount').textContent='0'; return; }
       $('methodCount').textContent = methods.length;
       el.innerHTML = methods.map(m => {
-        const icon = m.status==='passed'?'✅':m.status==='failed'?'❌':m.status==='planned'?'📋':m.status==='skipped'?'⏭':'⬜';
-        const cls = m.status==='passed'?' passed':m.status==='failed'?' failed':'';
-        const cost = m.cost ? '$'+m.cost.toFixed(4) : '—';
+        const icon = m.status==='passed'?'✅':m.status==='failed'?'❌':m.status==='planned'?'📋':m.status==='analyzed'?'🔎':m.status==='skipped'?'⏭':'⬜';
+        const cls = m.status==='passed'?' passed':m.status==='failed'?' failed':m.status==='analyzed'?' analyzed':'';
+        const cost = m.status==='analyzed' ? 'uncovered' : (m.cost ? '$'+m.cost.toFixed(4) : '—');
         const att = m.attempts > 1 ? ` (${m.attempts}x)` : '';
+        const note = m.status === 'analyzed' ? '<div class="method-note">Coverage gap found during analysis</div>' : '';
         const plan = m.plan
           ? `<details class="method-plan"><summary>Plan: ${m.plan.totalCases} test cases</summary>` +
             `<div class="plan-file">${esc(m.plan.fileName || '')}</div>` +
@@ -1002,9 +1007,78 @@
           : '';
         return `<div class="method-card${cls}">` +
           `<span class="method-status">${icon}</span>` +
-          `<div class="method-body"><div class="method-name">${esc(m.method)}</div>${plan}</div>` +
+          `<div class="method-body"><div class="method-name">${esc(m.method)}</div>${note}${plan}</div>` +
           `<span class="method-meta">${cost}${att}</span></div>`;
       }).join('');
+    }
+
+    function formatCompletionMessage(service, action, summary, totalCost) {
+      if (!summary) {
+        return `Done! ${service} pipeline finished. Cost: $${totalCost.toFixed(4)}`;
+      }
+
+      if (action === 'analyze') {
+        const uncovered = Array.isArray(summary.uncoveredMethods) ? summary.uncoveredMethods : [];
+        const preview = uncovered.slice(0, 5).join(', ');
+        const more = uncovered.length > 5 ? `, +${uncovered.length - 5} more` : '';
+        const nextStep = uncovered.length
+          ? `Next step: plan or cover ${preview}${more}.`
+          : 'Next step: no uncovered methods found.';
+
+        return (
+          `Analysis complete for ${service}.\n` +
+          `Coverage: ${summary.coveragePercent}% (${summary.coveredCount}/${summary.totalMethods} methods covered).\n` +
+          `Uncovered methods: ${summary.uncoveredCount}.\n` +
+          nextStep
+        );
+      }
+
+      if (action === 'plan') {
+        if (!summary.processedCount) {
+          return (
+            `Plan complete for ${service}.\n` +
+            `No uncovered methods were selected for planning.\n` +
+            `Cost: $${totalCost.toFixed(4)}`
+          );
+        }
+
+        return (
+          `Plan ready for ${service}.\n` +
+          `Methods planned: ${summary.plannedCount}/${summary.processedCount}.\n` +
+          `Needs attention: ${summary.failedCount} failed to plan.\n` +
+          `Cost: $${totalCost.toFixed(4)}`
+        );
+      }
+
+      if (action === 'cover') {
+        if (!summary.processedCount) {
+          return (
+            `Cover run complete for ${service}.\n` +
+            `Nothing new needed coverage.\n` +
+            `Cost: $${totalCost.toFixed(4)}`
+          );
+        }
+
+        return (
+          `Finished covering ${service}.\n` +
+          `Methods passed: ${summary.passedCount}/${summary.processedCount}.` +
+          (summary.failedCount ? ` Failed methods: ${summary.failedCount}.` : '') + '\n' +
+          `Test files created: ${summary.testsCreated}. Tests passed: ${summary.testsPassedTotal}, failed: ${summary.testsFailedTotal}.\n` +
+          `Cost: $${totalCost.toFixed(4)}`
+        );
+      }
+
+      if (action === 'fix') {
+        return (
+          `Fix run complete for ${service}.\n` +
+          `Methods passing: ${summary.passedCount}/${summary.processedCount}.` +
+          (summary.failedCount ? ` Still failing: ${summary.failedCount}.` : ' No failing methods remain.') + '\n' +
+          `Tests passed: ${summary.testsPassedTotal}, failed: ${summary.testsFailedTotal}.\n` +
+          `Cost: $${totalCost.toFixed(4)}`
+        );
+      }
+
+      return `Done! ${service} pipeline finished. Cost: $${totalCost.toFixed(4)}`;
     }
 
     function renderPlanCase(testCase, isSchema) {
@@ -1044,6 +1118,7 @@
         const res = await fetch('/api/services');
         const data = await res.json();
         services = data.services || [];
+        protoSyncReport = data.protoSync || null;
       } catch {}
     }
 
@@ -1064,15 +1139,52 @@
           </ul>
         </div>
       `;
+      const protoSync = renderProtoSyncBlock(protoSyncReport);
       addChatMsg('agent',
-        'Hello! I\'m your QA testing assistant. Tell me what to test — for example:\n' +
-        '• "Покрий тестами ClientWallets"\n' +
-        '• "Проаналізуй XpEngine"\n' +
-        '• "Plan tests for BrokerSettings"',
-        reminders + (services.length ? '<div class="service-chips">' + chips + '</div>' : ''),
+        'Hello! I\'m your AQA testing assistant.',
+        protoSync + reminders + (services.length ? '<div class="service-chips">' + chips + '</div>' : ''),
         null,
         false
       );
+    }
+
+    function renderProtoSyncBlock(report) {
+      if (!report || !report.syncedAt) return '';
+
+      const syncedAt = new Date(report.syncedAt).toLocaleString();
+      if (!report.hasChanges) {
+        return `
+          <div class="welcome-block">
+            <div class="welcome-title">Latest Proto Sync</div>
+            <ul class="welcome-list">
+              <li>No contract changes detected.</li>
+              <li>Last synced: ${esc(syncedAt)}</li>
+            </ul>
+          </div>
+        `;
+      }
+
+      const changedFiles = Array.isArray(report.changedFiles) ? report.changedFiles : [];
+      const changedServices = Array.isArray(report.changedServices) ? report.changedServices : [];
+      const details = changedServices.slice(0, 4).map(change => {
+        const parts = [];
+        if (change.addedMethods?.length) parts.push(`+ ${change.addedMethods.join(', ')}`);
+        if (change.changedMethods?.length) parts.push(`~ ${change.changedMethods.join(', ')}`);
+        if (change.removedMethods?.length) parts.push(`- ${change.removedMethods.join(', ')}`);
+        return `<li><strong>${esc(change.service)}</strong>: ${esc(parts.join(' | ') || change.status || 'updated')}</li>`;
+      }).join('');
+
+      return `
+        <div class="welcome-block">
+          <div class="welcome-title">Latest Proto Sync</div>
+          <ul class="welcome-list">
+            <li>${changedFiles.length} proto file(s) changed.</li>
+            <li>Updated services: ${esc(changedServices.map(change => change.service).join(', '))}</li>
+            ${details}
+            <li>Last synced: ${esc(syncedAt)}</li>
+          </ul>
+        </div>
+      `;
     }
 
     function restoreChat() {

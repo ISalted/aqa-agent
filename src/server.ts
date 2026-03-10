@@ -8,10 +8,11 @@ import { pipelineEvents, emitPipelineEvent } from "./events.js";
 import type { PipelineEvent } from "./events.js";
 import { loadRunHistory, loadRunLedger } from "./memory/run-history.js";
 import { loadProjectIndex } from "./memory/project-index.js";
+import { loadProtoChangeReport } from "./memory/proto-changes.js";
 import { runPipeline } from "./engine/orchestrator.js";
 import { chatTurn } from "./chat-agent.js";
 import { syncProtos } from "./scripts/sync-protos.js";
-import type { ParsedIntent } from "./types.js";
+import type { ParsedIntent, ProtoChangeReport } from "./types.js";
 
 const CHAT_LOG_PATH = join(import.meta.dirname, "../state/chat-log.jsonl");
 
@@ -33,26 +34,29 @@ const MAX_HISTORY = 30;
 const SYNC_CACHE_MS = 60_000;
 let lastProtoSyncAt = 0;
 let activeProtoSync: Promise<void> | null = null;
+let lastProtoSyncReport: ProtoChangeReport | null = loadProtoChangeReport();
 
-async function ensureProtoSync(force = false): Promise<void> {
+async function ensureProtoSync(force = false): Promise<ProtoChangeReport | null> {
   if (activeProtoSync) {
     await activeProtoSync;
-    return;
+    return lastProtoSyncReport;
   }
 
   if (!force && Date.now() - lastProtoSyncAt < SYNC_CACHE_MS) {
-    return;
+    return lastProtoSyncReport;
   }
 
   activeProtoSync = syncProtos()
-    .then(() => {
+    .then((report) => {
       lastProtoSyncAt = Date.now();
+      lastProtoSyncReport = report;
     })
     .finally(() => {
       activeProtoSync = null;
     });
 
   await activeProtoSync;
+  return lastProtoSyncReport;
 }
 
 // ─── API: available services ─────────────────────────────────
@@ -80,7 +84,7 @@ app.get("/api/services", async (_req, res) => {
   }
 
   const index = loadProjectIndex();
-  res.json({ services, index });
+  res.json({ services, index, protoSync: lastProtoSyncReport });
 });
 
 // ─── API: run history ────────────────────────────────────────
@@ -100,7 +104,7 @@ app.get("/api/runs/:id", (req, res) => {
 });
 
 app.get("/api/status", (_req, res) => {
-  res.json({ running: pipelineRunning, bootId: serverBootId });
+  res.json({ running: pipelineRunning, bootId: serverBootId, protoSync: lastProtoSyncReport });
 });
 
 // ─── API: chat (LLM-powered intent parsing) ─────────────────

@@ -115,6 +115,8 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
     log(state, `Coverage: ${state.coverage.coveragePercent}% — uncovered: ${state.coverage.uncoveredMethods.join(", ") || "none"}`);
 
     if (intent.action === "analyze") {
+      state.methodResults = buildAnalyzeMethodResults(state);
+      updateMemory(state);
       state.phase = "done";
       log(state, "Analysis complete (no implementation requested)");
       printCoverageSummary(state);
@@ -123,6 +125,7 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
 
     const methodsToProcess = selectMethods(state);
     if (methodsToProcess.length === 0) {
+      updateMemory(state);
       state.phase = "done";
       log(state, "All methods already covered! Nothing to do.");
       return;
@@ -439,11 +442,13 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
 
     emitPipelineEvent("complete", state.runId, {
       phase: state.phase,
+      action: state.intent.action,
       service: state.service,
       totalCost: state.cost.totalUsd,
       durationMs,
       totalInputTokens: state.cost.totalInputTokens,
       totalOutputTokens: state.cost.totalOutputTokens,
+      summary: buildCompletionSummary(state),
       methods: state.methodResults.map(serializeMethodResult),
       costByAgent: Object.fromEntries(
         [...new Map<string, number>(
@@ -479,6 +484,21 @@ function selectMethods(state: RunState): string[] {
   }
 }
 
+function buildAnalyzeMethodResults(state: RunState): MethodResult[] {
+  if (!state.coverage) return [];
+
+  return state.coverage.uncoveredMethods.map((method) => ({
+    method,
+    plan: null,
+    testFile: null,
+    result: null,
+    failures: [],
+    attempts: 0,
+    cost: 0,
+    status: "analyzed",
+  }));
+}
+
 function serializeMethodResult(methodResult: MethodResult) {
   return {
     method: methodResult.method,
@@ -496,6 +516,43 @@ function serializeMethodResult(methodResult: MethodResult) {
           testCases: methodResult.plan.testCases,
         }
       : null,
+  };
+}
+
+function buildCompletionSummary(state: RunState) {
+  const coveredCount = state.coverage?.coveredMethods.length ?? 0;
+  const uncoveredMethods = state.coverage?.uncoveredMethods ?? [];
+  const passedMethods = state.methodResults.filter((m) => m.status === "passed");
+  const failedMethods = state.methodResults.filter((m) => m.status === "failed");
+  const plannedMethods = state.methodResults.filter((m) => m.status === "planned");
+  const analyzedMethods = state.methodResults.filter((m) => m.status === "analyzed");
+  const skippedMethods = state.methodResults.filter((m) => m.status === "skipped");
+  const createdFiles = state.methodResults.filter((m) => m.testFile).length;
+  const testsPassedTotal = state.methodResults.reduce(
+    (sum, m) => sum + (m.result?.passed ?? 0),
+    0,
+  );
+  const testsFailedTotal = state.methodResults.reduce(
+    (sum, m) => sum + (m.result?.failed ?? 0),
+    0,
+  );
+
+  return {
+    action: state.intent.action,
+    totalMethods: state.contract?.methods.length ?? 0,
+    coveredCount,
+    uncoveredCount: uncoveredMethods.length,
+    uncoveredMethods,
+    coveragePercent: state.coverage?.coveragePercent ?? 0,
+    processedCount: state.methodResults.length,
+    plannedCount: plannedMethods.length,
+    passedCount: passedMethods.length,
+    failedCount: failedMethods.length,
+    analyzedCount: analyzedMethods.length,
+    skippedCount: skippedMethods.length,
+    testsCreated: createdFiles,
+    testsPassedTotal,
+    testsFailedTotal,
   };
 }
 
