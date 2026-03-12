@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { writeFileSync, mkdirSync } from "fs";
-import { join } from "path";
+import { join, basename } from "path";
 import { createCostAccumulator, formatCostReport } from "../cost/tracker.js";
 import { resolveService } from "../steps/resolve-service.js";
 import { parseContract } from "../steps/parse-contract.js";
@@ -10,10 +10,15 @@ import { writeTests } from "../steps/write-tests.js";
 import { runTests } from "../steps/run-tests.js";
 import { debugTests } from "../steps/debug-tests.js";
 import { validatePlan, validateGeneratedCode } from "../steps/guardrails.js";
-import {
-  updateServiceIndex,
-} from "../memory/project-index.js";
+import { updateServiceIndex } from "../memory/project-index.js";
 import { appendRunHistory, saveRunLedger } from "../memory/run-history.js";
+import {
+  savePlanArtifacts,
+  loadPlanArtifacts,
+  loadPlanContext,
+  saveLastImplementRun,
+  type PlanContext,
+} from "../memory/resumable-context.js";
 import { emitPipelineEvent } from "../events.js";
 import type {
   RunState,
@@ -25,11 +30,20 @@ import type {
   LedgerDecision,
   LedgerAttempt,
   RunHistoryEntry,
+  TestPlan,
 } from "../types.js";
 
 const MAX_DEBUG_RETRIES = 2;
 
-export async function runPipeline(intent: ParsedIntent): Promise<void> {
+class AbortError extends Error {
+  constructor() { super("Pipeline aborted by user"); this.name = "AbortError"; }
+}
+
+function checkAbort(signal?: AbortSignal): void {
+  if (signal?.aborted) throw new AbortError();
+}
+
+export async function runPipeline(intent: ParsedIntent, signal?: AbortSignal): Promise<void> {
   const skillTradePath = process.env.SKILL_TRADE_PATH;
   if (!skillTradePath) {
     throw new Error("SKILL_TRADE_PATH not set in .env");
@@ -63,11 +77,52 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
     methods: state.intent.methods,
   });
 
-  try {
+  let savedPlanContext: PlanContext | null = null;
+  if (intent.action === "implement_only") {
+    savedPlanContext = loadPlanContext(intent.service);
+  }
+  const skipResolve =
+    intent.action === "implement_only" &&
+    savedPlanContext != null &&
+    savedPlanContext.protoPath != null &&
+    savedPlanContext.testDir != null;
+
+  if (skipResolve && savedPlanContext) {
+    state.infrastructure = {
+      service: intent.service,
+      protoPath: savedPlanContext.protoPath,
+      testDir: savedPlanContext.testDir,
+      wrapperPath: null,
+      typesPath: null,
+      generatedPath: null,
+      fixtureConnected: false,
+      missingComponents: [],
+    };
+    state.contract = parseContract(
+      savedPlanContext.protoPath,
+      intent.service,
+    );
+    state.coverage = analyzeCoverage(state.contract, skillTradePath);
+    log(state, "Using saved plan context (skipping resolve/parse/coverage)");
+    // Emit completed events for skipped phases so UI shows ✓ on those steps
+    for (const phase of ["resolve", "parse", "coverage", "plan"] as const) {
+      emitPipelineEvent("log", state.runId, { phase, message: `(restored from saved plan)`, elapsed: 0, cost: 0 });
+      emitPipelineEvent("phase", state.runId, { phase, status: "complete" });
+    }
+  }
+
+  if (!skipResolve) {
     // ─── Phase: Resolve Infrastructure ──────────────────────
+    checkAbort(signal);
     state.phase = "resolve";
-    const isReadOnly = intent.action === "analyze" || intent.action === "plan";
-    log(state, `Resolving service infrastructure${isReadOnly ? " (read-only)" : ""}...`);
+    const isReadOnly =
+      intent.action === "analyze" ||
+      intent.action === "plan" ||
+      intent.action === "validate_only";
+    log(
+      state,
+      `Resolving service infrastructure${isReadOnly ? " (read-only)" : ""}...`,
+    );
 
     state.infrastructure = await resolveService(
       intent.service,
@@ -89,19 +144,27 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
     }
 
     // ─── Phase: Parse Contract ──────────────────────────────
+    checkAbort(signal);
     state.phase = "parse";
     log(state, "Parsing proto contract...");
 
-    state.contract = parseContract(state.infrastructure.protoPath, intent.service);
+    state.contract = parseContract(
+      state.infrastructure.protoPath,
+      intent.service,
+    );
     ledgerFacts.push({
       what: `Contract: ${state.contract.methods.length} methods, ${state.contract.messages.length} messages`,
       source: state.infrastructure.protoPath,
       confirmed: true,
     });
 
-    log(state, `Found ${state.contract.methods.length} methods: ${state.contract.methods.map((m) => m.name).join(", ")}`);
+    log(
+      state,
+      `Found ${state.contract.methods.length} methods: ${state.contract.methods.map((m) => m.name).join(", ")}`,
+    );
 
     // ─── Phase: Analyze Coverage ────────────────────────────
+    checkAbort(signal);
     state.phase = "coverage";
     log(state, "Analyzing test coverage...");
 
@@ -112,9 +175,28 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
       confirmed: true,
     });
 
-    log(state, `Coverage: ${state.coverage.coveragePercent}% — uncovered: ${state.coverage.uncoveredMethods.join(", ") || "none"}`);
+    log(
+      state,
+      `Coverage: ${state.coverage.coveragePercent}% — uncovered: ${state.coverage.uncoveredMethods.join(", ") || "none"}`,
+    );
+  }
 
-    if (intent.action === "analyze") {
+  let savedPlansForResume: Record<string, TestPlan> | null = null;
+  if (intent.action === "implement_only") {
+    savedPlansForResume =
+      savedPlanContext?.plans ?? loadPlanArtifacts(intent.service);
+    if (
+      !savedPlansForResume ||
+      Object.keys(savedPlansForResume).length === 0
+    ) {
+      throw new Error(
+        `No saved plans for service "${intent.service}". Run plan first (e.g. "plan tests for ${intent.service}").`,
+      );
+    }
+  }
+
+  try {
+  if (intent.action === "analyze") {
       state.methodResults = buildAnalyzeMethodResults(state);
       updateMemory(state);
       state.phase = "done";
@@ -123,22 +205,34 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
       return;
     }
 
-    const methodsToProcess = selectMethods(state);
+    const methodsToProcess = selectMethods(state, savedPlansForResume);
     if (methodsToProcess.length === 0) {
       updateMemory(state);
       state.phase = "done";
-      log(state, "All methods already covered! Nothing to do.");
+      if (intent.action === "validate_only") {
+        log(state, "No test files found for this service.");
+      } else {
+        log(state, "All methods already covered! Nothing to do.");
+      }
       return;
     }
 
     ledgerDecisions.push({
       what: `Processing ${methodsToProcess.length} methods`,
-      why: intent.action === "cover" ? "Uncovered methods found" : "User requested",
+      why:
+        intent.action === "cover"
+          ? "Uncovered methods found"
+          : intent.action === "implement_only"
+            ? "Using saved plans from previous plan run"
+            : intent.action === "validate_only"
+              ? "Running tests only (no write, no debug)"
+              : "User requested",
       alternatives: ["Skip already covered", "Regenerate all"],
     });
 
     // ─── Per-Method Loop ────────────────────────────────────
     for (let i = 0; i < methodsToProcess.length; i++) {
+      checkAbort(signal);
       const method = methodsToProcess[i];
       state.currentMethodIndex = i;
 
@@ -155,6 +249,35 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
       state.methodResults.push(methodResult);
 
       const costBefore = state.cost.totalUsd;
+
+      // ─── Validate only: run tests, no debug ─────────────────
+      if (intent.action === "validate_only") {
+        const existingTest = state.coverage!.coveredMethods.find(
+          (c) => c.method === method,
+        );
+        if (!existingTest) {
+          methodResult.status = "skipped";
+          log(state, `  No test file for ${method}, skipping`);
+          methodResult.cost = state.cost.totalUsd - costBefore;
+          emitMethodResult(state, methodResult);
+          continue;
+        }
+        state.phase = "validate";
+        log(state, `[${i + 1}/${methodsToProcess.length}] Running tests: ${method}`);
+        methodResult.testFile = existingTest.testFile;
+        methodResult.attempts++;
+        const testResult = runTests(existingTest.testFile, skillTradePath);
+        methodResult.result = testResult;
+        methodResult.status =
+          testResult.failed === 0 && testResult.passed > 0 ? "passed" : "failed";
+        log(
+          state,
+          `  ${methodResult.status === "passed" ? "PASSED" : "FAILED"}: ${testResult.passed} passed, ${testResult.failed} failed`,
+        );
+        methodResult.cost = state.cost.totalUsd - costBefore;
+        emitMethodResult(state, methodResult);
+        continue;
+      }
 
       // ─── Fix: re-run existing tests and debug failures ─
       if (intent.action === "fix") {
@@ -188,7 +311,10 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
 
         state.phase = "debug";
         let debugAttempt = 0;
-        while (debugAttempt < MAX_DEBUG_RETRIES && currentTestResult.failed > 0) {
+        while (
+          debugAttempt < MAX_DEBUG_RETRIES &&
+          currentTestResult.failed > 0
+        ) {
           debugAttempt++;
           log(state, `  Debug attempt ${debugAttempt}/${MAX_DEBUG_RETRIES}...`);
 
@@ -209,7 +335,10 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
             currentTestResult = runTests(existingTest.testFile, skillTradePath);
             methodResult.result = currentTestResult;
 
-            if (currentTestResult.failed === 0 && currentTestResult.passed > 0) {
+            if (
+              currentTestResult.failed === 0 &&
+              currentTestResult.passed > 0
+            ) {
               methodResult.status = "passed";
               log(state, `  FIXED: ${currentTestResult.passed} tests now pass`);
               break;
@@ -230,7 +359,7 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
         continue;
       }
 
-      // ─── Plan ─────────────────────────────────────────
+      // ─── Plan only: generate test plans, save for later implement_only ─
       if (intent.action === "plan") {
         state.phase = "plan";
         log(state, `[${i + 1}/${methodsToProcess.length}] Planning: ${method}`);
@@ -246,10 +375,16 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
         if (planResult.plan && planResult.guardrailResult?.valid) {
           methodResult.plan = planResult.plan;
           methodResult.status = "planned";
-          log(state, `  Plan OK: ${planResult.plan.testCases.length + 1} test cases`);
+          log(
+            state,
+            `  Plan OK: ${planResult.plan.testCases.length + 1} test cases`,
+          );
         } else {
           methodResult.status = "failed";
-          const reason = planResult.error ?? planResult.guardrailResult?.errors.join("; ") ?? "Unknown";
+          const reason =
+            planResult.error ??
+            planResult.guardrailResult?.errors.join("; ") ??
+            "Unknown";
           log(state, `  Plan FAILED: ${reason}`);
         }
 
@@ -258,41 +393,69 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
         continue;
       }
 
-      // ─── Plan + Implement + Run + Debug ───────────────
-      state.phase = "plan";
-      log(state, `[${i + 1}/${methodsToProcess.length}] Planning: ${method}`);
-
-      const planResult = await planTests(
-        state.contract!,
-        state.coverage!,
-        method,
-        skillTradePath,
-        state.cost,
-      );
-
-      if (!planResult.plan) {
-        methodResult.status = "failed";
-        log(state, `  Plan FAILED: ${planResult.error}`);
-        ledgerAttempts.push({
-          step: "plan",
-          method,
-          result: "failure",
-          cost: state.cost.totalUsd - costBefore,
-          duration: 0,
-          error: planResult.error,
-        });
+      // ─── Implement only: use saved plan from previous plan run ─
+      let planToUse: TestPlan;
+      if (intent.action === "implement_only") {
+        const savedPlan = savedPlansForResume![method];
+        if (!savedPlan) {
+          methodResult.status = "skipped";
+          log(state, `  No saved plan for ${method}, skipping`);
+          methodResult.cost = state.cost.totalUsd - costBefore;
+          emitMethodResult(state, methodResult);
+          continue;
+        }
+        planToUse = savedPlan;
+        methodResult.plan = planToUse;
+        methodResult.status = "planned";
+        log(
+          state,
+          `[${i + 1}/${methodsToProcess.length}] Using saved plan for: ${method}`,
+        );
         emitMethodResult(state, methodResult);
-        continue;
-      }
+      } else {
+        // ─── Cover: Plan + Implement + Run + Debug ───────────────
+        state.phase = "plan";
+        log(state, `[${i + 1}/${methodsToProcess.length}] Planning: ${method}`);
 
-      if (!planResult.guardrailResult?.valid) {
-        log(state, `  Plan guardrail warnings: ${planResult.guardrailResult?.errors.join("; ")}`);
-      }
+        const planResult = await planTests(
+          state.contract!,
+          state.coverage!,
+          method,
+          skillTradePath,
+          state.cost,
+        );
 
-      methodResult.plan = planResult.plan;
-      methodResult.status = "planned";
-      log(state, `  Plan OK: ${planResult.plan.testCases.length + 1} test cases`);
-      emitMethodResult(state, methodResult);
+        if (!planResult.plan) {
+          methodResult.status = "failed";
+          log(state, `  Plan FAILED: ${planResult.error}`);
+          ledgerAttempts.push({
+            step: "plan",
+            method,
+            result: "failure",
+            cost: state.cost.totalUsd - costBefore,
+            duration: 0,
+            error: planResult.error,
+          });
+          emitMethodResult(state, methodResult);
+          continue;
+        }
+
+        if (!planResult.guardrailResult?.valid) {
+          log(
+            state,
+            `  Plan guardrail warnings: ${planResult.guardrailResult?.errors.join("; ")}`,
+          );
+        }
+
+        planToUse = planResult.plan;
+        methodResult.plan = planToUse;
+        methodResult.status = "planned";
+        log(
+          state,
+          `  Plan OK: ${planToUse.testCases.length + 1} test cases`,
+        );
+        emitMethodResult(state, methodResult);
+      }
 
       // ─── Write ────────────────────────────────────────
       state.phase = "implement";
@@ -301,9 +464,10 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
       const writeResult = await writeTests(
         state.contract!,
         state.coverage!,
-        planResult.plan,
+        planToUse,
         skillTradePath,
         state.cost,
+        state.infrastructure!.testDir,
       );
 
       if (!writeResult.code) {
@@ -317,7 +481,10 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
       state.phase = "validate";
       const codeValidation = validateGeneratedCode(writeResult.code);
       if (codeValidation.warnings.length > 0) {
-        log(state, `  Guardrail warnings: ${codeValidation.warnings.join("; ")}`);
+        log(
+          state,
+          `  Guardrail warnings: ${codeValidation.warnings.join("; ")}`,
+        );
       }
       if (!codeValidation.valid) {
         log(state, `  Guardrail BLOCKED: ${codeValidation.errors.join("; ")}`);
@@ -335,9 +502,11 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
         continue;
       }
 
+      // Ensure target test directory exists (especially when skipping resolve in implement_only)
+      mkdirSync(state.infrastructure!.testDir, { recursive: true });
       const testFilePath = join(
         state.infrastructure!.testDir,
-        planResult.plan.fileName,
+        basename(planToUse.fileName),
       );
       writeFileSync(testFilePath, writeResult.code);
       methodResult.testFile = testFilePath;
@@ -345,84 +514,24 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
       log(state, `  File written: ${testFilePath}`);
       emitMethodResult(state, methodResult);
 
-      // ─── Run ──────────────────────────────────────────
-      log(state, `  Running tests...`);
-      methodResult.attempts++;
-      const testResult = runTests(testFilePath, skillTradePath);
-      methodResult.result = testResult;
-
-      if (testResult.failed === 0 && testResult.passed > 0) {
-        methodResult.status = "passed";
-        log(state, `  PASSED: ${testResult.passed} tests in ${testResult.duration}ms`);
-        ledgerAttempts.push({
-          step: "run",
-          method,
-          result: "success",
-          cost: state.cost.totalUsd - costBefore,
-          duration: testResult.duration,
-        });
-        methodResult.cost = state.cost.totalUsd - costBefore;
-        emitMethodResult(state, methodResult);
-        continue;
-      }
-
-      // ─── Debug Loop ───────────────────────────────────
-      state.phase = "debug";
-      let debugAttempt = 0;
-      let currentTestResult = testResult;
-
-      while (debugAttempt < MAX_DEBUG_RETRIES && currentTestResult.failed > 0) {
-        debugAttempt++;
-        log(state, `  Debug attempt ${debugAttempt}/${MAX_DEBUG_RETRIES}...`);
-
-        const debugResult = await debugTests(
-          state.contract!,
-          state.coverage!,
-          testFilePath,
-          currentTestResult,
-          skillTradePath,
-          state.cost,
-        );
-
-        methodResult.failures.push(...debugResult.failures);
-
-        if (debugResult.fixedCode) {
-          writeFileSync(testFilePath, debugResult.fixedCode);
-          methodResult.attempts++;
-          currentTestResult = runTests(testFilePath, skillTradePath);
-          methodResult.result = currentTestResult;
-
-          if (currentTestResult.failed === 0 && currentTestResult.passed > 0) {
-            methodResult.status = "passed";
-            log(state, `  PASSED after debug: ${currentTestResult.passed} tests`);
-            break;
-          }
-        } else {
-          log(state, `  Debug produced no fix: ${debugResult.error}`);
-          break;
-        }
-      }
-
-      if (methodResult.status !== "passed") {
-        methodResult.status = "failed";
-        log(state, `  FAILED after ${debugAttempt} debug attempts`);
-      }
-
-      ledgerAttempts.push({
-        step: "implement",
-        method,
-        result: methodResult.status === "passed" ? "success" : "failure",
-        cost: state.cost.totalUsd - costBefore,
-        duration: currentTestResult.duration,
-        error: currentTestResult.errors[0]?.message,
-      });
-
+      // For now, skip automatic run+debug in the cover pipeline to save tokens.
+      // Tests will be executed only when the user explicitly asks via validate_only / fix actions.
       methodResult.cost = state.cost.totalUsd - costBefore;
       emitMethodResult(state, methodResult);
+      continue;
     }
 
     // ─── Phase: Save & Report ───────────────────────────────
     state.phase = "save";
+    if (intent.action === "plan") {
+      savePlanArtifacts(state.service, state.runId, state.methodResults, state.infrastructure ? { protoPath: state.infrastructure.protoPath, testDir: state.infrastructure.testDir } : undefined);
+    }
+    if (
+      intent.action === "cover" ||
+      intent.action === "implement_only"
+    ) {
+      saveLastImplementRun(state.service, state.runId, state.methodResults);
+    }
     updateMemory(state);
 
     state.phase = "report";
@@ -431,9 +540,19 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
     state.phase = "done";
     log(state, "Pipeline complete");
   } catch (error) {
-    state.phase = "failed";
-    log(state, `FATAL: ${(error as Error).message}`);
-    throw error;
+    if ((error as Error).name === "AbortError") {
+      state.phase = "stopped";
+      log(state, "Pipeline stopped by user");
+      emitPipelineEvent("aborted", state.runId, {
+        phase: state.phase,
+        service: state.service,
+        totalCost: state.cost.totalUsd,
+      });
+    } else {
+      state.phase = "failed";
+      log(state, `FATAL: ${(error as Error).message}`);
+      throw error;
+    }
   } finally {
     const durationMs = Date.now() - startMs;
     saveLedger(state, ledgerFacts, ledgerDecisions, ledgerAttempts, durationMs);
@@ -450,13 +569,22 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
       totalOutputTokens: state.cost.totalOutputTokens,
       summary: buildCompletionSummary(state),
       methods: state.methodResults.map(serializeMethodResult),
-      costByAgent: Object.fromEntries(
-        [...new Map<string, number>(
+      costByAgent: Object.fromEntries([
+        ...new Map<string, number>(
           state.cost.steps.reduce((acc, s) => {
             acc.set(s.agent, (acc.get(s.agent) ?? 0) + s.costUsd);
             return acc;
           }, new Map<string, number>()),
-        )],
+        ),
+      ]),
+      costByPhase: Object.fromEntries(
+        state.cost.steps.reduce((acc, s) => {
+          // step names: "resolve:ServiceName", "plan:MethodName", "write:MethodName", "debug:file.ts"
+          const prefix = s.step.split(":")[0];
+          const phase = prefix === "write" ? "implement" : prefix;
+          acc.set(phase, (acc.get(phase) ?? 0) + s.costUsd);
+          return acc;
+        }, new Map<string, number>()),
       ),
     });
   }
@@ -464,9 +592,23 @@ export async function runPipeline(intent: ParsedIntent): Promise<void> {
 
 // ─── Helpers ────────────────────────────────────────────────
 
-function selectMethods(state: RunState): string[] {
+function selectMethods(
+  state: RunState,
+  savedPlansForResume?: Record<string, TestPlan> | null,
+): string[] {
   const { intent, coverage } = state;
   if (!coverage) return [];
+
+  if (intent.action === "implement_only" && savedPlansForResume) {
+    if (intent.methods && intent.methods.length > 0) {
+      return intent.methods.filter((m) => savedPlansForResume[m]);
+    }
+    return Object.keys(savedPlansForResume);
+  }
+
+  if (intent.action === "validate_only") {
+    return coverage.coveredMethods.map((c) => c.method);
+  }
 
   if (intent.methods && intent.methods.length > 0) {
     return intent.methods;
@@ -522,11 +664,21 @@ function serializeMethodResult(methodResult: MethodResult) {
 function buildCompletionSummary(state: RunState) {
   const coveredCount = state.coverage?.coveredMethods.length ?? 0;
   const uncoveredMethods = state.coverage?.uncoveredMethods ?? [];
-  const passedMethods = state.methodResults.filter((m) => m.status === "passed");
-  const failedMethods = state.methodResults.filter((m) => m.status === "failed");
-  const plannedMethods = state.methodResults.filter((m) => m.status === "planned");
-  const analyzedMethods = state.methodResults.filter((m) => m.status === "analyzed");
-  const skippedMethods = state.methodResults.filter((m) => m.status === "skipped");
+  const passedMethods = state.methodResults.filter(
+    (m) => m.status === "passed",
+  );
+  const failedMethods = state.methodResults.filter(
+    (m) => m.status === "failed",
+  );
+  const plannedMethods = state.methodResults.filter(
+    (m) => m.status === "planned",
+  );
+  const analyzedMethods = state.methodResults.filter(
+    (m) => m.status === "analyzed",
+  );
+  const skippedMethods = state.methodResults.filter(
+    (m) => m.status === "skipped",
+  );
   const createdFiles = state.methodResults.filter((m) => m.testFile).length;
   const testsPassedTotal = state.methodResults.reduce(
     (sum, m) => sum + (m.result?.passed ?? 0),
@@ -566,7 +718,9 @@ function emitMethodResult(state: RunState, methodResult: MethodResult): void {
 function updateMemory(state: RunState): void {
   if (!state.contract || !state.coverage) return;
 
-  const passedMethods = state.methodResults.filter((m) => m.status === "passed");
+  const passedMethods = state.methodResults.filter(
+    (m) => m.status === "passed",
+  );
   const newCoverage = Math.round(
     ((state.coverage.coveredMethods.length + passedMethods.length) /
       state.contract.methods.length) *
@@ -589,11 +743,14 @@ function updateMemory(state: RunState): void {
     timestamp: state.startedAt,
     service: state.service,
     action: state.intent.action,
-    methodsCovered: state.methodResults.filter((m) => m.status === "passed").length,
+    methodsCovered: state.methodResults.filter((m) => m.status === "passed")
+      .length,
     totalMethods: state.contract.methods.length,
     testsCreated: state.methodResults.filter((m) => m.testFile).length,
-    testsPassed: state.methodResults.filter((m) => m.status === "passed").length,
-    testsFailed: state.methodResults.filter((m) => m.status === "failed").length,
+    testsPassed: state.methodResults.filter((m) => m.status === "passed")
+      .length,
+    testsFailed: state.methodResults.filter((m) => m.status === "failed")
+      .length,
     totalCostUsd: state.cost.totalUsd,
     durationMs: Date.now() - new Date(state.startedAt).getTime(),
   };
@@ -653,13 +810,17 @@ function printReport(state: RunState): void {
     console.log(`  ${icon} ${mr.method}: ${mr.status}${attempts} — ${cost}`);
 
     if (mr.result && mr.result.passed > 0) {
-      console.log(`     ${mr.result.passed} passed, ${mr.result.failed} failed`);
+      console.log(
+        `     ${mr.result.passed} passed, ${mr.result.failed} failed`,
+      );
     }
   }
 
   console.log("─".repeat(60));
 
-  const passed = state.methodResults.filter((m) => m.status === "passed").length;
+  const passed = state.methodResults.filter(
+    (m) => m.status === "passed",
+  ).length;
   const total = state.methodResults.length;
   console.log(`Result: ${passed}/${total} methods passed`);
 }
@@ -684,7 +845,10 @@ function printCoverageSummary(state: RunState): void {
 }
 
 function log(state: RunState, msg: string): void {
-  const elapsed = ((Date.now() - new Date(state.startedAt).getTime()) / 1000).toFixed(1);
+  const elapsed = (
+    (Date.now() - new Date(state.startedAt).getTime()) /
+    1000
+  ).toFixed(1);
   console.log(`[${state.runId}] [${elapsed}s] [${state.phase}] ${msg}`);
   emitPipelineEvent("log", state.runId, {
     phase: state.phase,

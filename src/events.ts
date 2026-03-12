@@ -1,7 +1,7 @@
 import { EventEmitter } from "events";
 
 export interface PipelineEvent {
-  type: "started" | "log" | "phase" | "method-result" | "complete" | "error";
+  type: "started" | "log" | "phase" | "method-result" | "complete" | "error" | "aborted";
   runId: string;
   timestamp: string;
   data: Record<string, unknown>;

@@ -82,8 +82,16 @@ export async function syncProtos(): Promise<ProtoChangeReport> {
 
   const currentSnapshots = buildProtoSnapshots(targetDir);
   const report = diffProtoSnapshots(previousSnapshots, currentSnapshots);
-  saveProtoSnapshots(currentSnapshots);
-  saveProtoChangeReport(report);
+  if (report.hasChanges) {
+    // Detected contract changes. Keep previous snapshots as baseline
+    // and only persist the change report so the UI can show pending diffs
+    // until the user explicitly updates the snapshot.
+    saveProtoChangeReport(report);
+  } else {
+    // No changes compared to previous baseline — safe to update snapshots.
+    saveProtoSnapshots(currentSnapshots);
+    saveProtoChangeReport(report);
+  }
   logChangeSummary(report);
   return report;
 }
@@ -99,7 +107,7 @@ function removeDeletedProtoFiles(targetDir: string, sourceProtoFiles: string[]):
   }
 }
 
-function buildProtoSnapshots(protoDir: string): ProtoSnapshotsStore {
+export function buildProtoSnapshots(protoDir: string): ProtoSnapshotsStore {
   const services: Record<string, ProtoServiceSnapshot> = {};
   const capturedAt = new Date().toISOString();
 

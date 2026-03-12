@@ -71,7 +71,10 @@ function buildPlannerPrompt(
   const inputMsg = contract.messages.find((m) => m.name === methodDef?.inputType);
   const outputMsg = contract.messages.find((m) => m.name === methodDef?.outputType);
 
-  return `Create a test plan for method "${method}" of service "${contract.service}".
+  // Use intentName (from proto filename) for naming — it's the canonical identifier,
+  // resilient to typos in proto's service declaration (e.g. ContestEngine vs MissionEngine).
+  const serviceName = contract.intentName ?? contract.service;
+  return `Create a test plan for method "${method}" of service "${serviceName}".
 
 ## Proto Contract
 \`\`\`protobuf

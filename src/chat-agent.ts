@@ -4,6 +4,10 @@ import { existsSync } from "fs";
 import { globSync } from "glob";
 import { join } from "path";
 import { loadProjectIndex } from "./memory/project-index.js";
+import {
+  loadLastPlanRun,
+  loadLastImplementRun,
+} from "./memory/resumable-context.js";
 import type { ParsedIntent } from "./types.js";
 
 const client = new Anthropic();
@@ -26,9 +30,9 @@ const PIPELINE_TOOL: Anthropic.Tool = {
     properties: {
       action: {
         type: "string",
-        enum: ["cover", "analyze", "plan", "fix"],
+        enum: ["cover", "analyze", "plan", "fix", "implement_only", "validate_only"],
         description:
-          "cover = write tests, analyze = coverage report, plan = test plans, fix = repair failures",
+          "cover = full cycle (plan+write), analyze = coverage only, plan = plans only, fix = repair failures, implement_only = write from saved plans, validate_only = run tests only (no write/debug)",
       },
       service: {
         type: "string",
@@ -55,6 +59,8 @@ function getAvailableServices(skillTradePath: string): string[] {
 function buildSystemPrompt(skillTradePath: string): string {
   const services = getAvailableServices(skillTradePath);
   const index = loadProjectIndex();
+  const lastPlan = loadLastPlanRun();
+  const lastImplement = loadLastImplementRun();
 
   const serviceLines = services
     .map((s) => {
@@ -66,6 +72,26 @@ function buildSystemPrompt(skillTradePath: string): string {
     })
     .join("\n");
 
+  const lastPlanSection =
+    lastPlan && lastPlan.methods.length > 0
+      ? [
+          "",
+          "Last plan run (resumable):",
+          `  Service: ${lastPlan.service}. Methods with saved plans: ${lastPlan.methods.join(", ")}.`,
+          "  If user says \"реалізуй тести\" / \"тепер імплементуй\" → use action implement_only and this service.",
+        ].join("\n")
+      : "";
+
+  const lastImplementSection =
+    lastImplement && lastImplement.methods.length > 0
+      ? [
+          "",
+          "Last implement run (can validate):",
+          `  Service: ${lastImplement.service}. Test files: ${lastImplement.methods.length} method(s).`,
+          "  If user says \"запусти тести\" / \"завалідуй\" / \"run tests\" → use action validate_only and this service.",
+        ].join("\n")
+      : "";
+
   return [
     "You are AQA Agent — an AI test automation assistant for gRPC services (Playwright + TypeScript).",
     "",
@@ -73,17 +99,22 @@ function buildSystemPrompt(skillTradePath: string): string {
     serviceLines,
     "",
     "Available actions:",
-    "  - cover: write tests for uncovered methods",
-    "  - analyze: coverage report only (no code changes)",
-    "  - plan: generate test plans only",
-    "  - fix: repair failing tests",
+    "  - cover: full cycle — plan + write tests for uncovered methods",
+    "  - analyze: coverage report only",
+    "  - plan: generate test plans only (saves for implement_only)",
+    "  - fix: repair failing tests (run + debug)",
+    "  - implement_only: write tests using saved plans (after plan run)",
+    "  - validate_only: run tests only, no write/debug (after implement)",
+    lastPlanSection,
+    lastImplementSection,
     "",
     "Rules:",
-    "- When you clearly understand what the user wants → call start_pipeline immediately",
-    "- If unclear (which service? which action?) → ask a short clarifying question (1-2 sentences)",
-    "- Match the service name EXACTLY from the available list above",
-    "- Respond in the same language the user writes in",
-    "- Be concise — no lengthy explanations",
+    "- If user just ran plan and asks to implement (\"реалізуй тести\", \"тепер імплементуй\") → use implement_only for that service.",
+    "- If user asks to run/validate tests (\"запусти тести\", \"завалідуй\") and we have last implement run → use validate_only for that service.",
+    "- If user clearly asks for analyze, plan, cover, fix, implement, or validate for a service → call start_pipeline immediately with that action and exact service name.",
+    "- Match the service name EXACTLY from the list above.",
+    "- Respond in the same language the user writes in.",
+    "- Be concise.",
   ].join("\n");
 }
 

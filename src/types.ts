@@ -7,9 +7,7 @@
 
 export type ModelTier = "haiku" | "sonnet" | "opus";
 
-export type ThinkingConfig =
-  | { type: "adaptive" }
-  | { type: "disabled" };
+export type ThinkingConfig = { type: "adaptive" } | { type: "disabled" };
 
 export type EffortLevel = "low" | "medium" | "high" | "max";
 
@@ -224,11 +222,18 @@ export interface MethodResult {
   failures: ClassifiedFailure[];
   attempts: number;
   cost: number;
-  status: "pending" | "analyzed" | "planned" | "written" | "passed" | "failed" | "skipped";
+  status:
+    | "pending"
+    | "analyzed"
+    | "planned"
+    | "written"
+    | "passed"
+    | "failed"
+    | "skipped";
 }
 
 export interface ParsedIntent {
-  action: "cover" | "fix" | "analyze" | "plan";
+  action: "cover" | "fix" | "analyze" | "plan" | "implement_only" | "validate_only";
   service: string;
   methods?: string[];
   raw: string;

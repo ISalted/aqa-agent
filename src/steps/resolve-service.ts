@@ -35,7 +35,9 @@ export async function resolveService(
     const testDir = findTestDir(dirs.testDir, serviceName);
     return {
       ...snapshot,
-      testDir: testDir ?? join(dirs.testDir, serviceName.charAt(0).toLowerCase() + serviceName.slice(1)),
+      testDir:
+        testDir ??
+        join(dirs.testDir, serviceNameToTestDirName(serviceName)),
     };
   }
 
@@ -233,20 +235,25 @@ function checkFixtureConnection(skillTradePath: string, service: string): boolea
   return content.toLowerCase().includes(service.toLowerCase());
 }
 
+/** PascalCase service name → kebab-case folder name (e.g. MissionEngine → mission-engine). Exported for use in analyze-coverage. */
+export function serviceNameToTestDirName(service: string): string {
+  const withHyphens = service.replace(/([A-Z])/g, "-$1").toLowerCase();
+  return withHyphens.startsWith("-") ? withHyphens.slice(1) : withHyphens;
+}
+
 function findTestDir(testRoot: string, service: string): string | null {
   if (!existsSync(testRoot)) return null;
-  const candidates = globSync("*/", { cwd: testRoot });
-  const match = candidates.find((d) =>
-    d.replace(/\/$/, "").toLowerCase().includes(service.toLowerCase()),
-  );
-  return match ? join(testRoot, match) : null;
+  const expectedDirName = serviceNameToTestDirName(service);
+  const candidatePath = join(testRoot, expectedDirName);
+  if (existsSync(candidatePath)) return candidatePath;
+  return null;
 }
 
 function findOrCreateTestDir(testRoot: string, service: string): string {
   const existing = findTestDir(testRoot, service);
   if (existing) return existing;
 
-  const dirName = service.charAt(0).toLowerCase() + service.slice(1);
+  const dirName = serviceNameToTestDirName(service);
   const newDir = join(testRoot, dirName);
   mkdirSync(newDir, { recursive: true });
   return newDir;

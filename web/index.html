@@ -171,6 +171,34 @@
     .chat-msg .welcome-list li + li {
       margin-top: 4px;
     }
+    .chat-msg .welcome-actions {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .chat-msg .welcome-btn {
+      font-size: 11px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--accent);
+      background: var(--accent-dim);
+      color: var(--accent);
+      cursor: pointer;
+      transition: opacity .15s, transform .15s;
+    }
+    .chat-msg .welcome-btn:hover {
+      opacity: .95;
+      transform: translateY(-1px);
+    }
+    .chat-msg .welcome-btn:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+      transform: none;
+      border-color: var(--border);
+      color: var(--text-4);
+      background: var(--bg-3);
+    }
     .chat-msg.system {
       align-self: center; background: var(--bg-2); color: var(--text-4);
       font-size: 11px; border-radius: 6px; padding: 6px 12px;
@@ -242,6 +270,13 @@
       font-size: 10px; padding: 1px 6px; border-radius: 8px;
       background: var(--bg-3); color: var(--text-4); font-family: var(--mono);
     }
+    .stop-btn {
+      display: none; font-size: 10px; padding: 1px 7px; border-radius: 8px;
+      background: transparent; border: 1px solid #ef4444; color: #ef4444;
+      font-family: var(--mono); font-weight: 700; cursor: pointer;
+      letter-spacing: .3px; line-height: 1.4; transition: background .15s, color .15s;
+    }
+    .stop-btn:hover { background: #ef4444; color: #fff; }
 
     .pipeline-section { flex-shrink: 0; padding: 0 20px 10px; }
     .pipeline { display: flex; flex-direction: column; gap: 3px; }
@@ -267,6 +302,11 @@
     .phase-body { flex: 1; min-width: 0; }
     .phase-label { font-size: 13px; font-weight: 500; color: var(--text-1); }
     .phase-detail { font-size: 11px; color: var(--text-4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .phase-cost {
+      font-size: 10px; font-family: var(--mono); color: var(--text-4);
+      flex-shrink: 0; min-width: 52px; text-align: right; padding-right: 2px;
+    }
+    .pipeline-phase.complete .phase-cost { color: var(--success); }
 
     /* Log */
     .log-section {
@@ -442,7 +482,7 @@
       </div>
       <div class="chat-messages" id="chatMessages"></div>
       <div class="chat-input-area">
-        <textarea id="chatInput" rows="2" placeholder="Напиши тести для ClientWallets..."></textarea>
+        <textarea id="chatInput" rows="2" placeholder="e.g. plan tests for MissionEngine"></textarea>
         <button class="btn-send" id="sendBtn" onclick="sendMessage()">↑</button>
       </div>
     </aside>
@@ -454,7 +494,8 @@
       <div class="cost-section">
         <div class="section-header" style="padding:0 0 6px"><h2>Cost</h2></div>
         <div class="cost-total" id="costTotal">$0.0000</div>
-        <div class="cost-label">total USD</div>
+        <div class="cost-label">run USD</div>
+        <div id="sessionCost" class="session-cost" style="font-size:12px;color:var(--text-4);margin-top:4px;"></div>
         <div class="token-total" id="tokenTotal">0</div>
         <div class="token-label">total tokens</div>
         <div id="costBreakdown" class="cost-breakdown"></div>
@@ -462,17 +503,20 @@
       <div class="pipeline-section">
         <div class="section-header">
           <h2>Pipeline</h2>
-          <span id="pipelineStatus" class="count-badge">idle</span>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span id="pipelineStatus" class="count-badge">idle</span>
+            <button id="stopBtn" onclick="abortPipeline()" title="Stop pipeline" class="stop-btn">■ stop</button>
+          </div>
         </div>
         <div class="pipeline" id="pipeline">
-          <div class="pipeline-phase" data-phase="resolve"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Resolve</div><div class="phase-detail">Find service infrastructure</div></div></div>
-          <div class="pipeline-phase" data-phase="parse"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Parse</div><div class="phase-detail">Parse proto contract</div></div></div>
-          <div class="pipeline-phase" data-phase="coverage"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Coverage</div><div class="phase-detail">Analyze test coverage</div></div></div>
-          <div class="pipeline-phase" data-phase="plan"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Plan</div><div class="phase-detail">Generate test plans</div></div></div>
-          <div class="pipeline-phase" data-phase="implement"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Implement</div><div class="phase-detail">Write test code</div></div></div>
-          <div class="pipeline-phase" data-phase="validate"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Validate</div><div class="phase-detail">Run tests</div></div></div>
-          <div class="pipeline-phase" data-phase="debug"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Debug</div><div class="phase-detail">Fix failures</div></div></div>
-          <div class="pipeline-phase" data-phase="done"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Complete</div><div class="phase-detail">Pipeline finished</div></div></div>
+          <div class="pipeline-phase" data-phase="resolve"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Resolve</div><div class="phase-detail">Find service infrastructure</div></div><span class="phase-cost" data-cost-phase="resolve"></span></div>
+          <div class="pipeline-phase" data-phase="parse"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Parse</div><div class="phase-detail">Parse proto contract</div></div><span class="phase-cost" data-cost-phase="parse"></span></div>
+          <div class="pipeline-phase" data-phase="coverage"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Coverage</div><div class="phase-detail">Analyze test coverage</div></div><span class="phase-cost" data-cost-phase="coverage"></span></div>
+          <div class="pipeline-phase" data-phase="plan"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Plan</div><div class="phase-detail">Generate test plans</div></div><span class="phase-cost" data-cost-phase="plan"></span></div>
+          <div class="pipeline-phase" data-phase="implement"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Implement</div><div class="phase-detail">Write test code</div></div><span class="phase-cost" data-cost-phase="implement"></span></div>
+          <div class="pipeline-phase" data-phase="validate"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Validate</div><div class="phase-detail">Run tests</div></div><span class="phase-cost" data-cost-phase="validate"></span></div>
+          <div class="pipeline-phase" data-phase="debug"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Debug</div><div class="phase-detail">Fix failures</div></div><span class="phase-cost" data-cost-phase="debug"></span></div>
+          <div class="pipeline-phase" data-phase="done"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Complete</div><div class="phase-detail">Pipeline finished</div></div><span class="phase-cost" data-cost-phase="done"></span></div>
         </div>
       </div>
     </div>
@@ -517,16 +561,24 @@
 
     function handleEvent(ev) {
       switch (ev.type) {
-        case 'started':  onStarted(ev); break;
-        case 'log':      onLog(ev); break;
+        case 'started':       onStarted(ev); break;
+        case 'log':           onLog(ev); break;
+        case 'phase':         onPhase(ev); break;
         case 'method-result': onMethodResult(ev); break;
-        case 'complete': onComplete(ev); break;
-        case 'error':    onError(ev); break;
+        case 'complete':      onComplete(ev); break;
+        case 'aborted':       onAborted(ev); break;
+        case 'error':         onError(ev); break;
       }
+    }
+
+    function onPhase(ev) {
+      const { phase, status } = ev.data;
+      if (status === 'complete') markPhase(phase, 'complete');
     }
 
     function onStarted(ev) {
       $('runningBar').classList.remove('hidden');
+      $('stopBtn').style.display = 'inline-block';
       $('pipelineStatus').textContent = ev.data.action + ' ' + ev.data.service;
       $('footerLeft').textContent = `Running: ${ev.data.service}`;
       $('footerRight').textContent = '';
@@ -537,9 +589,10 @@
       $('costTotal').textContent = '$0.0000';
       $('tokenTotal').textContent = '0';
       $('costBreakdown').innerHTML = '';
+      clearPhaseCosts();
       $('methodsList').innerHTML = '<div class="empty-state">Running pipeline...</div>';
       $('methodCount').textContent = '0';
-      saveDashboardState({ methods: [], costByAgent: null });
+      saveDashboardState({ methods: [], costByAgent: null, costByPhase: null });
     }
 
     function onLog(ev) {
@@ -571,6 +624,7 @@
 
     function onComplete(ev) {
       $('runningBar').classList.add('hidden');
+      $('stopBtn').style.display = 'none';
       enableInput();
       if (activePhase && activePhase !== 'done' && activePhase !== 'failed') markPhase(activePhase, 'complete');
       const phase = ev.data.phase;
@@ -585,8 +639,10 @@
         addChatMsg('agent', 'Pipeline failed. Check the log for details.');
       }
       if (ev.data.totalCost !== undefined) $('costTotal').textContent = '$' + ev.data.totalCost.toFixed(4);
+      if (ev.data.sessionCost) updateSessionDisplay(ev.data.sessionCost);
       if (ev.data.methods) renderMethods(ev.data.methods);
       if (ev.data.costByAgent) renderCostBreakdown(ev.data.costByAgent, ev.data.totalCost);
+      if (ev.data.costByPhase) renderPhaseCosts(ev.data.costByPhase);
       const tokens = (ev.data.totalInputTokens||0) + (ev.data.totalOutputTokens||0);
       $('tokenTotal').textContent = String(tokens);
       $('footerRight').textContent = `${((ev.data.durationMs||0)/1000).toFixed(1)}s · ${(tokens/1000).toFixed(1)}K tokens`;
@@ -595,12 +651,24 @@
       saveDashboardState({
         methods: ev.data.methods || [],
         costByAgent: ev.data.costByAgent || null,
+        costByPhase: ev.data.costByPhase || null,
         tokenTotal: String(tokens),
       });
     }
 
+    function onAborted(ev) {
+      $('runningBar').classList.add('hidden');
+      $('stopBtn').style.display = 'none';
+      enableInput();
+      if (activePhase) markPhase(activePhase, 'failed');
+      $('pipelineStatus').textContent = 'stopped';
+      $('footerLeft').textContent = `Stopped — $${(ev.data.totalCost ?? 0).toFixed(4)} spent`;
+      addChatMsg('agent', 'Pipeline stopped.');
+    }
+
     function onError(ev) {
       $('runningBar').classList.add('hidden');
+      $('stopBtn').style.display = 'none';
       enableInput();
       $('pipelineStatus').textContent = 'error';
       $('footerLeft').textContent = 'Error';
@@ -715,6 +783,7 @@
       if (state.methodCount) $('methodCount').textContent = state.methodCount;
       if (state.footerLeft) $('footerLeft').textContent = state.footerLeft;
       if (state.footerRight) $('footerRight').textContent = state.footerRight;
+      if (state.costByPhase) renderPhaseCosts(state.costByPhase);
     }
 
     function applyChatWidth(widthPx) {
@@ -958,7 +1027,9 @@
     async function clearChat() {
       $('chatMessages').innerHTML = '';
       clearSavedChat();
-      await fetch('/api/chat/clear', { method: 'POST' });
+      const r = await fetch('/api/chat/clear', { method: 'POST' });
+      const data = await r.json();
+      if (data.sessionCost) updateSessionDisplay(data.sessionCost);
       showWelcome();
     }
 
@@ -966,6 +1037,7 @@
       try {
         const res = await fetch('/api/status');
         const data = await res.json();
+        if (data.sessionCost) updateSessionDisplay(data.sessionCost);
         const currentBootId = data.bootId || null;
         const savedBootId = localStorage.getItem(CHAT_BOOT_KEY);
 
@@ -987,6 +1059,16 @@
     });
 
     // ─── Methods / Cost / History ─────────────────────────
+
+    function updateSessionDisplay(sessionCost) {
+      const el = $('sessionCost');
+      if (!el) return;
+      if (!sessionCost || sessionCost.runCount === 0) {
+        el.textContent = '';
+        return;
+      }
+      el.textContent = `Session: $${sessionCost.totalUsd.toFixed(4)} (${sessionCost.runCount} run${sessionCost.runCount === 1 ? '' : 's'})`;
+    }
 
     function renderMethods(methods) {
       const el = $('methodsList');
@@ -1078,6 +1160,32 @@
         );
       }
 
+      if (action === 'implement_only') {
+        if (!summary.processedCount) {
+          return `Implement-only run for ${service}. No methods with saved plans.\nCost: $${totalCost.toFixed(4)}`;
+        }
+        return (
+          `Implemented tests from saved plans for ${service}.\n` +
+          `Methods passed: ${summary.passedCount}/${summary.processedCount}.` +
+          (summary.failedCount ? ` Failed: ${summary.failedCount}.` : '') + '\n' +
+          `Tests created: ${summary.testsCreated}. Passed: ${summary.testsPassedTotal}, failed: ${summary.testsFailedTotal}.\n` +
+          `Cost: $${totalCost.toFixed(4)}`
+        );
+      }
+
+      if (action === 'validate_only') {
+        if (!summary.processedCount) {
+          return `Validate-only run for ${service}. No test files to run.\nCost: $${totalCost.toFixed(4)}`;
+        }
+        return (
+          `Tests run for ${service}.\n` +
+          `Methods passed: ${summary.passedCount}/${summary.processedCount}.` +
+          (summary.failedCount ? ` Failed: ${summary.failedCount}.` : '') + '\n' +
+          `Tests passed: ${summary.testsPassedTotal}, failed: ${summary.testsFailedTotal}.\n` +
+          `Cost: $${totalCost.toFixed(4)}`
+        );
+      }
+
       return `Done! ${service} pipeline finished. Cost: $${totalCost.toFixed(4)}`;
     }
 
@@ -1089,6 +1197,19 @@
         `<div class="plan-case-meta">${esc(type)} · ${esc(testCase.priority || 'P?')}</div>` +
         `<div>${esc(testCase.description || '')}</div>` +
         `</div>`;
+    }
+
+    function renderPhaseCosts(costByPhase) {
+      if (!costByPhase) return;
+      document.querySelectorAll('[data-cost-phase]').forEach(el => {
+        const phase = el.dataset.costPhase;
+        const cost = costByPhase[phase];
+        el.textContent = (cost != null && cost > 0) ? '$' + cost.toFixed(4) : '';
+      });
+    }
+
+    function clearPhaseCosts() {
+      document.querySelectorAll('[data-cost-phase]').forEach(el => el.textContent = '');
     }
 
     function renderCostBreakdown(byAgent, total) {
@@ -1125,9 +1246,6 @@
     // ─── Welcome ──────────────────────────────────────────
 
     function showWelcome() {
-      const chips = services.map(s =>
-        `<span class="service-chip" onclick="quickSend('cover ${s}')">${s}</span>`
-      ).join('');
       const reminders = `
         <div class="welcome-block">
           <div class="welcome-title">Before Run Check</div>
@@ -1142,7 +1260,7 @@
       const protoSync = renderProtoSyncBlock(protoSyncReport);
       addChatMsg('agent',
         'Hello! I\'m your AQA testing assistant.',
-        protoSync + reminders + (services.length ? '<div class="service-chips">' + chips + '</div>' : ''),
+        protoSync + reminders,
         null,
         false
       );
@@ -1152,6 +1270,19 @@
       if (!report || !report.syncedAt) return '';
 
       const syncedAt = new Date(report.syncedAt).toLocaleString();
+      const changedServices = Array.isArray(report.changedServices) ? report.changedServices : [];
+      const changedServiceNames = changedServices.map(change => change.service);
+      const chips = changedServiceNames.length
+        ? `<div class="service-chips">${changedServiceNames.map(service =>
+            `<span class="service-chip" onclick="quickSend('analyze ${service}')">${esc(service)}</span>`
+          ).join('')}</div>`
+        : '';
+      const action = `
+        <div class="welcome-actions">
+          <button class="welcome-btn" onclick="updateTestsForProtoChanges()" ${report.hasChanges ? '' : 'disabled'}>Sync Tests With Proto Changes</button>
+          <button class="welcome-btn" onclick="updateProtoSnapshot()">Mark Contracts As Baseline</button>
+        </div>
+      `;
       if (!report.hasChanges) {
         return `
           <div class="welcome-block">
@@ -1160,12 +1291,13 @@
               <li>No contract changes detected.</li>
               <li>Last synced: ${esc(syncedAt)}</li>
             </ul>
+            ${chips}
+            ${action}
           </div>
         `;
       }
 
       const changedFiles = Array.isArray(report.changedFiles) ? report.changedFiles : [];
-      const changedServices = Array.isArray(report.changedServices) ? report.changedServices : [];
       const details = changedServices.slice(0, 4).map(change => {
         const parts = [];
         if (change.addedMethods?.length) parts.push(`+ ${change.addedMethods.join(', ')}`);
@@ -1183,18 +1315,98 @@
             ${details}
             <li>Last synced: ${esc(syncedAt)}</li>
           </ul>
+          ${chips}
+          ${action}
         </div>
       `;
     }
 
+    async function updateTestsForProtoChanges() {
+      if ($('sendBtn').disabled) return;
+
+      addChatMsg('agent', 'Starting update for tests affected by latest proto changes...');
+      disableInput();
+
+      try {
+        const res = await fetch('/api/proto/update-tests', { method: 'POST' });
+        const data = await res.json();
+
+        if (!res.ok) {
+          addChatMsg('agent', data.error || 'Failed to start proto-based test update.');
+          enableInput();
+          return;
+        }
+
+        if (!data.started) {
+          addChatMsg('agent', data.message || 'No proto changes detected. Nothing to update.');
+          protoSyncReport = data.protoSync || protoSyncReport;
+          enableInput();
+          return;
+        }
+
+        const serviceList = Array.isArray(data.services) ? data.services.join(', ') : 'changed services';
+        addChatMsg('agent', `Updating tests for: ${serviceList}`);
+      } catch (e) {
+        addChatMsg('agent', 'Connection error: ' + e.message);
+        enableInput();
+      }
+    }
+
+    async function abortPipeline() {
+      // Optimistically update UI so the user immediately sees that the pipeline is stopping.
+      $('runningBar').classList.add('hidden');
+      $('stopBtn').style.display = 'none';
+      if (activePhase) markPhase(activePhase, 'failed');
+      $('pipelineStatus').textContent = 'stopping...';
+      $('footerLeft').textContent = 'Stopping pipeline...';
+
+      try {
+        const res = await fetch('/api/abort', { method: 'POST' });
+        if (!res.ok) {
+          addChatMsg('agent', 'Failed to stop pipeline: ' + (await res.text()));
+        }
+      } catch (e) {
+        addChatMsg('agent', 'Failed to stop pipeline: ' + e.message);
+      }
+    }
+
+    async function updateProtoSnapshot() {
+      if ($('sendBtn').disabled) return;
+
+      addChatMsg('agent', 'Marking current contracts as baseline snapshot...');
+      disableInput();
+
+      try {
+        const res = await fetch('/api/proto/update-snapshot', { method: 'POST' });
+        const data = await res.json();
+
+        if (!res.ok || !data.updated) {
+          addChatMsg('agent', data.error || 'Failed to update proto snapshot.');
+          enableInput();
+          return;
+        }
+
+        protoSyncReport = data.protoSync || protoSyncReport;
+        addChatMsg('agent', 'Baseline snapshot updated. Future syncs will treat current contracts as the new baseline.');
+      } catch (e) {
+        addChatMsg('agent', 'Connection error: ' + e.message);
+      } finally {
+        enableInput();
+      }
+    }
+
     function restoreChat() {
       const messages = loadSavedChat();
+
+      $('chatMessages').innerHTML = '';
+      // Always show the welcome / proto-sync block at the top of the chat,
+      // regardless of whether there is existing chat history.
+      showWelcome();
+
       if (!messages.length) {
-        showWelcome();
         return;
       }
 
-      $('chatMessages').innerHTML = '';
       for (const message of messages) {
         addChatMsg(
           message.role || 'agent',

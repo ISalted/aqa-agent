@@ -8,6 +8,8 @@ const ACTION_KEYWORDS: Record<ParsedIntent["action"], RegExp> = {
   analyze: /аналіз|проаналізу|analyze|coverage|покрит[тя]/i,
   plan: /план|plan|запланій/i,
   fix: /полагод|fix|виправ|repair|почин|лагод/i,
+  implement_only: /реалізуй тести|тепер реалізуй|тепер імплементуй|імплементуй тести|implement_only|implement only|збережених планів/i,
+  validate_only: /запусти тести|завалідуй|run tests|validate|заранити тести/i,
   cover: /покри[йтв]|cover|напиши|write|тестам|тести|test/i,
 };
 
@@ -28,14 +30,32 @@ function matchService(prompt: string, services: string[]): string | null {
   return null;
 }
 
+// Priority order: more specific/expensive actions win over simpler ones.
+// This handles compound intents like "analyze AND implement" → cover (full pipeline).
+const ACTION_PRIORITY: ParsedIntent["action"][] = [
+  "cover",
+  "implement_only",
+  "fix",
+  "validate_only",
+  "plan",
+  "analyze",
+];
+
 function matchAction(prompt: string): ParsedIntent["action"] {
+  const matched = new Set<ParsedIntent["action"]>();
   for (const [action, regex] of Object.entries(ACTION_KEYWORDS)) {
-    if (regex.test(prompt)) return action as ParsedIntent["action"];
+    if (regex.test(prompt)) matched.add(action as ParsedIntent["action"]);
+  }
+  for (const action of ACTION_PRIORITY) {
+    if (matched.has(action)) return action;
   }
   return "cover";
 }
 
-function matchMethods(prompt: string, serviceName: string): string[] | undefined {
+function matchMethods(
+  prompt: string,
+  serviceName: string,
+): string[] | undefined {
   const pascal = prompt.match(/\b[A-Z][a-z]+(?:[A-Z][a-z]+)+\b/g) || [];
   const methods = pascal.filter((w) => w !== serviceName);
   return methods.length > 0 ? methods : undefined;
@@ -72,7 +92,8 @@ export async function parsePromptLLM(
     system: [
       "Parse the user's request into a JSON object for a QA test automation agent.",
       `Available services: ${services.join(", ")}`,
-      'Available actions: cover (write tests), analyze (coverage report), plan (test plans), fix (repair failures)',
+      "Available actions: cover (full pipeline: write tests), analyze (coverage report only), plan (test plans only), fix (repair failures), implement_only (write from saved plans), validate_only (run tests only)",
+      "Action selection rules: if the user wants BOTH analysis AND implementation/tests → use 'cover'. Only use 'analyze' if the user explicitly wants only a coverage report with no implementation.",
       'Return ONLY valid JSON: {"action":"...","service":"...","methods":null}',
       'If methods are mentioned, return them as an array: {"methods":["MethodName"]}',
       "If you cannot determine the service, return null.",

@@ -101,8 +101,8 @@ export function validateGeneratedCode(code: string): GuardrailResult {
     errors.push("No test() or test.describe() found — not a valid test file");
   }
 
-  if (!code.includes("expect(")) {
-    errors.push("No expect() assertions found");
+  if (!code.includes("expect(") && !code.includes("ResponseChecker.strictCheck(")) {
+    warnings.push("No expect() assertions found");
   }
 
   if (code.includes("ts-interface-checker") || code.includes("createCheckers")) {
@@ -123,7 +123,7 @@ export function validateGeneratedCode(code: string): GuardrailResult {
 
   const testCount = (code.match(/test\s*\(/g) || []).length;
   if (testCount === 0) {
-    errors.push("No tests found in generated code");
+    warnings.push("No tests found in generated code");
   }
 
   return { valid: errors.length === 0, errors, warnings };

@@ -29,6 +29,8 @@ export interface AgenticLoopResult {
   toolCallCount: number;
   turns: number;
   abortReason?: string;
+  /** Tool invocations (name + input) from this run, for consumers that need to detect e.g. write_file content */
+  toolCalls?: { name: string; input: Record<string, unknown> }[];
 }
 
 export async function agenticLoop(
@@ -61,6 +63,7 @@ export async function agenticLoop(
   ];
 
   let totalToolCalls = 0;
+  const toolCalls: { name: string; input: Record<string, unknown> }[] = [];
 
   for (let turn = 0; turn < maxTurns; turn++) {
     const budgetCheck = checkBudget(costAccumulator, agentName);
@@ -70,6 +73,7 @@ export async function agenticLoop(
         toolCallCount: totalToolCalls,
         turns: turn,
         abortReason: budgetCheck.reason,
+        toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
       };
     }
 
@@ -98,6 +102,7 @@ export async function agenticLoop(
         text: textBlock?.text ?? "",
         toolCallCount: totalToolCalls,
         turns: turn + 1,
+        toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
       };
     }
 
@@ -113,6 +118,7 @@ export async function agenticLoop(
         text: textBlock?.text ?? "",
         toolCallCount: totalToolCalls,
         turns: turn + 1,
+        toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
       };
     }
 
@@ -121,6 +127,7 @@ export async function agenticLoop(
     const toolResults: Anthropic.ToolResultBlockParam[] = toolUseBlocks.map(
       (toolUse) => {
         totalToolCalls++;
+        toolCalls.push({ name: toolUse.name, input: toolUse.input as Record<string, unknown> });
         const result = executeTool(
           toolUse.name,
           toolUse.input as Record<string, unknown>,
@@ -141,6 +148,7 @@ export async function agenticLoop(
     toolCallCount: totalToolCalls,
     turns: maxTurns,
     abortReason: `Reached max turns (${maxTurns})`,
+    toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
   };
 }
 

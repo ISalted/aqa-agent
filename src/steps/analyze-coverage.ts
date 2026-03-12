@@ -1,6 +1,7 @@
 import { readFileSync, existsSync } from "fs";
 import { globSync } from "glob";
 import { basename, join } from "path";
+import { serviceNameToTestDirName } from "./resolve-service.js";
 import type {
   CoverageReport,
   CoveredMethod,
@@ -50,31 +51,9 @@ export function analyzeCoverage(
 }
 
 function findServiceTestDir(testRoot: string, serviceName: string): string | null {
-  const normalized = serviceName
-    .replace(/Service$/, "")
-    .replace(/Grpc$/, "");
-
-  const candidates = [
-    serviceName,
-    normalized,
-    camelToKebab(normalized),
-    camelToSnake(normalized),
-    normalized.toLowerCase(),
-  ];
-
-  for (const candidate of candidates) {
-    const dir = join(testRoot, candidate);
-    if (existsSync(dir)) return dir;
-  }
-
-  const allDirs = globSync("*/", { cwd: testRoot });
-  for (const dir of allDirs) {
-    const dirLower = dir.replace(/\/$/, "").toLowerCase();
-    if (dirLower.includes(normalized.toLowerCase())) {
-      return join(testRoot, dir);
-    }
-  }
-
+  const canonicalDirName = serviceNameToTestDirName(serviceName);
+  const dir = join(testRoot, canonicalDirName);
+  if (existsSync(dir)) return dir;
   return null;
 }
 
@@ -155,8 +134,4 @@ function extractExistingPatterns(
 
 function camelToKebab(str: string): string {
   return str.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
-}
-
-function camelToSnake(str: string): string {
-  return str.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
 }

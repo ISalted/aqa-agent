@@ -2,6 +2,7 @@ import { agenticLoop } from "../engine/agentic-loop.js";
 import { getModelForAgent } from "../engine/model-router.js";
 import { buildCoderContext } from "../rag/context-builder.js";
 import { validateGeneratedCode } from "./guardrails.js";
+import { basename, join } from "path";
 import type {
   NormalizedContract,
   CoverageReport,
@@ -28,10 +29,11 @@ export async function writeTests(
   plan: TestPlan,
   skillTradePath: string,
   costAccumulator: CostAccumulator,
+  testDir: string,
 ): Promise<WriteTestsResult> {
   const model = getModelForAgent("coder");
   const context = buildCoderContext(contract, coverage, plan.method, skillTradePath);
-  const userMessage = buildCoderPrompt(plan, context, skillTradePath);
+  const userMessage = buildCoderPrompt(plan, context, skillTradePath, testDir);
 
   const result = await agenticLoop({
     model,
@@ -39,7 +41,7 @@ export async function writeTests(
     userMessage,
     tools: TOOLS_FOR_AGENT.coder,
     effort: "high",
-    maxTurns: 15,
+    maxTurns: 25,
     costAccumulator,
     agentName: "coder",
     stepName: `write:${plan.method}`,
@@ -49,7 +51,10 @@ export async function writeTests(
     return { code: null, guardrailResult: null, error: result.abortReason };
   }
 
-  const code = extractCodeBlock(result.text);
+  let code = extractCodeBlock(result.text);
+  if (!code && result.toolCalls?.length) {
+    code = extractCodeFromWriteFileCalls(result.toolCalls, plan.fileName);
+  }
   if (!code) {
     return {
       code: null,
@@ -66,10 +71,12 @@ function buildCoderPrompt(
   plan: TestPlan,
   context: AgentContextLocal,
   skillTradePath: string,
+  testDir: string,
 ): string {
+  const targetPath = join(testDir, basename(plan.fileName));
   const parts = [
     `Write a complete Playwright test file for: ${plan.service}.${plan.method}`,
-    `File name: ${plan.fileName}`,
+    `Target file path (use this EXACT path when calling write_file): ${targetPath}`,
     `Working directory: ${skillTradePath}`,
     "",
     "## Test Plan",
@@ -139,5 +146,24 @@ function extractCodeBlock(text: string): string | null {
     return text.trim();
   }
 
+  return null;
+}
+
+/** If the coder wrote the file via write_file tool instead of outputting code in the message, use that content. */
+function extractCodeFromWriteFileCalls(
+  toolCalls: { name: string; input: Record<string, unknown> }[],
+  expectedFileName: string,
+): string | null {
+  const fileName = basename(expectedFileName);
+  for (let i = toolCalls.length - 1; i >= 0; i--) {
+    const call = toolCalls[i];
+    if (call.name !== "write_file") continue;
+    const path = typeof call.input.path === "string" ? call.input.path : "";
+    const content = typeof call.input.content === "string" ? call.input.content : "";
+    if (!path.endsWith(fileName)) continue;
+    if (content.includes("import ") && content.includes("test(")) {
+      return content.trim();
+    }
+  }
   return null;
 }
