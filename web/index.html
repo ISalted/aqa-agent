@@ -318,6 +318,13 @@
       font-family: var(--mono); font-size: 11.5px; line-height: 1.7;
     }
     .log-entry { display: flex; gap: 6px; animation: fadeIn .15s ease forwards; opacity: 0; }
+    .log-thinking { display: block; }
+    .thinking-details { border-left: 2px solid #7c3aed44; padding-left: 8px; margin: 2px 0; }
+    .thinking-details summary { cursor: pointer; display: flex; align-items: center; gap: 6px; list-style: none; user-select: none; }
+    .thinking-details summary::-webkit-details-marker { display: none; }
+    .thinking-details[open] summary { margin-bottom: 4px; }
+    .thinking-badge { font-size: 10px; color: #a78bfa; font-family: var(--mono); font-weight: 700; flex-shrink: 0; }
+    .thinking-pre { margin: 0; padding: 8px 10px; background: #1a1040; border-radius: 5px; font-size: 11px; color: #c4b5fd; font-family: var(--mono); white-space: pre-wrap; word-break: break-word; max-height: 400px; overflow-y: auto; line-height: 1.6; }
     .log-time { color: var(--text-4); flex-shrink: 0; min-width: 36px; text-align: right; }
     .log-phase { font-weight: 600; flex-shrink: 0; min-width: 68px; }
     .log-msg { color: var(--text-3); word-break: break-word; }
@@ -596,15 +603,17 @@
     }
 
     function onLog(ev) {
-      const { phase, message, elapsed, cost } = ev.data;
-      if (phase !== activePhase && phase !== 'init' && phase !== 'save' && phase !== 'report') {
-        if (activePhase) markPhase(activePhase, 'complete');
-        activePhase = phase;
-        if (phase !== 'done' && phase !== 'failed') markPhase(phase, 'active');
+      const { phase, message, elapsed, cost, isThinking } = ev.data;
+      if (!isThinking) {
+        if (phase !== activePhase && phase !== 'init' && phase !== 'save' && phase !== 'report') {
+          if (activePhase) markPhase(activePhase, 'complete');
+          activePhase = phase;
+          if (phase !== 'done' && phase !== 'failed') markPhase(phase, 'active');
+        }
+        if (cost !== undefined && cost !== null) $('costTotal').textContent = '$' + cost.toFixed(4);
+        updatePhaseDetail(phase, message);
       }
-      if (cost !== undefined && cost !== null) $('costTotal').textContent = '$' + cost.toFixed(4);
-      appendLog(elapsed, phase, message);
-      updatePhaseDetail(phase, message);
+      appendLog(elapsed, phase, message, !!isThinking);
       saveDashboardState();
     }
 
@@ -702,11 +711,20 @@
       if (el) el.textContent = msg.replace(/^\s+/, '').substring(0, 80);
     }
 
-    function appendLog(elapsed, phase, message) {
+    function appendLog(elapsed, phase, message, isThinking = false) {
       const s = $('logStream');
       const d = document.createElement('div');
-      d.className = 'log-entry';
-      d.innerHTML = `<span class="log-time">${elapsed}s</span><span class="log-phase" data-p="${esc(phase)}">${esc(phase)}</span><span class="log-msg">${esc(message)}</span>`;
+      if (isThinking) {
+        d.className = 'log-entry log-thinking';
+        d.innerHTML =
+          `<details class="thinking-details">` +
+          `<summary><span class="thinking-badge">🧠 thinking</span><span class="log-phase" data-p="${esc(phase)}">${esc(phase)}</span></summary>` +
+          `<pre class="thinking-pre">${esc(message)}</pre>` +
+          `</details>`;
+      } else {
+        d.className = 'log-entry';
+        d.innerHTML = `<span class="log-time">${elapsed}s</span><span class="log-phase" data-p="${esc(phase)}">${esc(phase)}</span><span class="log-msg">${esc(message)}</span>`;
+      }
       s.appendChild(d);
       s.scrollTop = s.scrollHeight;
       logCount++;

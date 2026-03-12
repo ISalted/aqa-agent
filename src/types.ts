@@ -233,7 +233,13 @@ export interface MethodResult {
 }
 
 export interface ParsedIntent {
-  action: "cover" | "fix" | "analyze" | "plan" | "implement_only" | "validate_only";
+  action:
+    | "cover"
+    | "fix"
+    | "analyze"
+    | "plan"
+    | "implement_only"
+    | "validate_only";
   service: string;
   methods?: string[];
   raw: string;

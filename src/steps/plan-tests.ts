@@ -14,6 +14,7 @@ export interface PlanTestsResult {
   plan: TestPlan | null;
   guardrailResult: GuardrailResult | null;
   error?: string;
+  thinking?: string;
 }
 
 /**
@@ -45,7 +46,7 @@ export async function planTests(
   });
 
   if (result.abortReason) {
-    return { plan: null, guardrailResult: null, error: result.abortReason };
+    return { plan: null, guardrailResult: null, error: result.abortReason, thinking: result.thinking };
   }
 
   const plan = extractJson<TestPlan>(result.text);
@@ -58,7 +59,7 @@ export async function planTests(
   }
 
   const guardrailResult = validatePlan(plan);
-  return { plan, guardrailResult };
+  return { plan, guardrailResult, thinking: result.thinking };
 }
 
 function buildPlannerPrompt(

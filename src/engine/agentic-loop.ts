@@ -31,6 +31,8 @@ export interface AgenticLoopResult {
   abortReason?: string;
   /** Tool invocations (name + input) from this run, for consumers that need to detect e.g. write_file content */
   toolCalls?: { name: string; input: Record<string, unknown> }[];
+  /** Concatenated thinking blocks from all turns, for debugging */
+  thinking?: string;
 }
 
 export async function agenticLoop(
@@ -64,6 +66,7 @@ export async function agenticLoop(
 
   let totalToolCalls = 0;
   const toolCalls: { name: string; input: Record<string, unknown> }[] = [];
+  const allThinking: string[] = [];
 
   for (let turn = 0; turn < maxTurns; turn++) {
     const budgetCheck = checkBudget(costAccumulator, agentName);
@@ -94,6 +97,16 @@ export async function agenticLoop(
       cache_creation_input_tokens: response.usage.cache_creation_input_tokens ?? undefined,
     });
 
+    // Collect extended thinking blocks from this turn
+    const turnThinking = response.content
+      .filter((b): b is Anthropic.ThinkingBlock => b.type === "thinking")
+      .map((b) => b.thinking);
+    if (turnThinking.length > 0) {
+      allThinking.push(turn > 0 ? `[turn ${turn + 1}]\n${turnThinking.join("\n")}` : turnThinking.join("\n"));
+    }
+
+    const thinking = allThinking.length > 0 ? allThinking.join("\n\n---\n\n") : undefined;
+
     if (response.stop_reason === "end_turn") {
       const textBlock = response.content.find(
         (b): b is Anthropic.TextBlock => b.type === "text",
@@ -103,6 +116,7 @@ export async function agenticLoop(
         toolCallCount: totalToolCalls,
         turns: turn + 1,
         toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+        thinking,
       };
     }
 
@@ -119,6 +133,7 @@ export async function agenticLoop(
         toolCallCount: totalToolCalls,
         turns: turn + 1,
         toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+        thinking,
       };
     }
 
@@ -149,6 +164,7 @@ export async function agenticLoop(
     turns: maxTurns,
     abortReason: `Reached max turns (${maxTurns})`,
     toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+    thinking: allThinking.length > 0 ? allThinking.join("\n\n---\n\n") : undefined,
   };
 }
 

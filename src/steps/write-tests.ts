@@ -16,6 +16,7 @@ export interface WriteTestsResult {
   code: string | null;
   guardrailResult: GuardrailResult | null;
   error?: string;
+  thinking?: string;
 }
 
 /**
@@ -48,7 +49,7 @@ export async function writeTests(
   });
 
   if (result.abortReason) {
-    return { code: null, guardrailResult: null, error: result.abortReason };
+    return { code: null, guardrailResult: null, error: result.abortReason, thinking: result.thinking };
   }
 
   let code = extractCodeBlock(result.text);
@@ -60,11 +61,12 @@ export async function writeTests(
       code: null,
       guardrailResult: null,
       error: "Failed to extract code from LLM response",
+      thinking: result.thinking,
     };
   }
 
   const guardrailResult = validateGeneratedCode(code);
-  return { code, guardrailResult };
+  return { code, guardrailResult, thinking: result.thinking };
 }
 
 function buildCoderPrompt(

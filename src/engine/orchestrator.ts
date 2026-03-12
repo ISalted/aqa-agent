@@ -36,14 +36,20 @@ import type {
 const MAX_DEBUG_RETRIES = 2;
 
 class AbortError extends Error {
-  constructor() { super("Pipeline aborted by user"); this.name = "AbortError"; }
+  constructor() {
+    super("Pipeline aborted by user");
+    this.name = "AbortError";
+  }
 }
 
 function checkAbort(signal?: AbortSignal): void {
   if (signal?.aborted) throw new AbortError();
 }
 
-export async function runPipeline(intent: ParsedIntent, signal?: AbortSignal): Promise<void> {
+export async function runPipeline(
+  intent: ParsedIntent,
+  signal?: AbortSignal,
+): Promise<void> {
   const skillTradePath = process.env.SKILL_TRADE_PATH;
   if (!skillTradePath) {
     throw new Error("SKILL_TRADE_PATH not set in .env");
@@ -98,15 +104,17 @@ export async function runPipeline(intent: ParsedIntent, signal?: AbortSignal): P
       fixtureConnected: false,
       missingComponents: [],
     };
-    state.contract = parseContract(
-      savedPlanContext.protoPath,
-      intent.service,
-    );
+    state.contract = parseContract(savedPlanContext.protoPath, intent.service);
     state.coverage = analyzeCoverage(state.contract, skillTradePath);
     log(state, "Using saved plan context (skipping resolve/parse/coverage)");
     // Emit completed events for skipped phases so UI shows ✓ on those steps
     for (const phase of ["resolve", "parse", "coverage", "plan"] as const) {
-      emitPipelineEvent("log", state.runId, { phase, message: `(restored from saved plan)`, elapsed: 0, cost: 0 });
+      emitPipelineEvent("log", state.runId, {
+        phase,
+        message: `(restored from saved plan)`,
+        elapsed: 0,
+        cost: 0,
+      });
       emitPipelineEvent("phase", state.runId, { phase, status: "complete" });
     }
   }
@@ -185,10 +193,7 @@ export async function runPipeline(intent: ParsedIntent, signal?: AbortSignal): P
   if (intent.action === "implement_only") {
     savedPlansForResume =
       savedPlanContext?.plans ?? loadPlanArtifacts(intent.service);
-    if (
-      !savedPlansForResume ||
-      Object.keys(savedPlansForResume).length === 0
-    ) {
+    if (!savedPlansForResume || Object.keys(savedPlansForResume).length === 0) {
       throw new Error(
         `No saved plans for service "${intent.service}". Run plan first (e.g. "plan tests for ${intent.service}").`,
       );
@@ -196,7 +201,7 @@ export async function runPipeline(intent: ParsedIntent, signal?: AbortSignal): P
   }
 
   try {
-  if (intent.action === "analyze") {
+    if (intent.action === "analyze") {
       state.methodResults = buildAnalyzeMethodResults(state);
       updateMemory(state);
       state.phase = "done";
@@ -263,13 +268,18 @@ export async function runPipeline(intent: ParsedIntent, signal?: AbortSignal): P
           continue;
         }
         state.phase = "validate";
-        log(state, `[${i + 1}/${methodsToProcess.length}] Running tests: ${method}`);
+        log(
+          state,
+          `[${i + 1}/${methodsToProcess.length}] Running tests: ${method}`,
+        );
         methodResult.testFile = existingTest.testFile;
         methodResult.attempts++;
         const testResult = runTests(existingTest.testFile, skillTradePath);
         methodResult.result = testResult;
         methodResult.status =
-          testResult.failed === 0 && testResult.passed > 0 ? "passed" : "failed";
+          testResult.failed === 0 && testResult.passed > 0
+            ? "passed"
+            : "failed";
         log(
           state,
           `  ${methodResult.status === "passed" ? "PASSED" : "FAILED"}: ${testResult.passed} passed, ${testResult.failed} failed`,
@@ -372,6 +382,16 @@ export async function runPipeline(intent: ParsedIntent, signal?: AbortSignal): P
           state.cost,
         );
 
+        if (planResult.thinking) {
+          emitPipelineEvent("log", state.runId, {
+            phase: "plan",
+            message: planResult.thinking,
+            elapsed: 0,
+            cost: 0,
+            isThinking: true,
+          });
+        }
+
         if (planResult.plan && planResult.guardrailResult?.valid) {
           methodResult.plan = planResult.plan;
           methodResult.status = "planned";
@@ -450,10 +470,7 @@ export async function runPipeline(intent: ParsedIntent, signal?: AbortSignal): P
         planToUse = planResult.plan;
         methodResult.plan = planToUse;
         methodResult.status = "planned";
-        log(
-          state,
-          `  Plan OK: ${planToUse.testCases.length + 1} test cases`,
-        );
+        log(state, `  Plan OK: ${planToUse.testCases.length + 1} test cases`);
         emitMethodResult(state, methodResult);
       }
 
@@ -469,6 +486,16 @@ export async function runPipeline(intent: ParsedIntent, signal?: AbortSignal): P
         state.cost,
         state.infrastructure!.testDir,
       );
+
+      if (writeResult.thinking) {
+        emitPipelineEvent("log", state.runId, {
+          phase: "implement",
+          message: writeResult.thinking,
+          elapsed: 0,
+          cost: 0,
+          isThinking: true,
+        });
+      }
 
       if (!writeResult.code) {
         methodResult.status = "failed";
@@ -524,12 +551,19 @@ export async function runPipeline(intent: ParsedIntent, signal?: AbortSignal): P
     // ─── Phase: Save & Report ───────────────────────────────
     state.phase = "save";
     if (intent.action === "plan") {
-      savePlanArtifacts(state.service, state.runId, state.methodResults, state.infrastructure ? { protoPath: state.infrastructure.protoPath, testDir: state.infrastructure.testDir } : undefined);
+      savePlanArtifacts(
+        state.service,
+        state.runId,
+        state.methodResults,
+        state.infrastructure
+          ? {
+              protoPath: state.infrastructure.protoPath,
+              testDir: state.infrastructure.testDir,
+            }
+          : undefined,
+      );
     }
-    if (
-      intent.action === "cover" ||
-      intent.action === "implement_only"
-    ) {
+    if (intent.action === "cover" || intent.action === "implement_only") {
       saveLastImplementRun(state.service, state.runId, state.methodResults);
     }
     updateMemory(state);
