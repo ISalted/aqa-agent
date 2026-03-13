@@ -10,7 +10,7 @@ export const PHASE_TRANSITIONS: Readonly<Record<Phase, readonly Phase[]>> = {
   parse:     ["coverage", "failed", "stopped"],
   coverage:  ["plan", "implement", "validate", "done", "failed", "stopped"],
   plan:      ["plan", "implement", "save", "done", "failed", "stopped"],
-  implement: ["implement", "validate", "save", "failed", "stopped"],
+  implement: ["implement", "validate", "plan", "save", "failed", "stopped"],
   validate:  ["validate", "plan", "implement", "debug", "save", "done", "failed", "stopped"],
   debug:     ["debug", "validate", "save", "failed", "stopped"],
   save:      ["report", "failed"],

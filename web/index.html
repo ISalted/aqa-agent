@@ -597,9 +597,7 @@
       $('tokenTotal').textContent = '0';
       $('costBreakdown').innerHTML = '';
       clearPhaseCosts();
-      $('methodsList').innerHTML = '<div class="empty-state">Running pipeline...</div>';
-      $('methodCount').textContent = '0';
-      saveDashboardState({ methods: [], costByAgent: null, costByPhase: null });
+      saveDashboardState({ costByAgent: null, costByPhase: null });
     }
 
     function onLog(ev) {

@@ -240,27 +240,42 @@ function truncateToolResult(result: string, maxChars = 30_000): string {
 }
 
 /**
- * Compresses tool_result content in older turns to keep message history lean.
+ * Compresses old turns to keep message history lean.
  * Keeps the last 2 turns untouched. Thinking blocks are never touched — Anthropic API requires them intact.
- * Each "turn" = assistant message + user/tool_results message (2 entries).
+ * Each "turn" = assistant message (odd index) + user/tool_results message (even index).
  * messages[0] is the initial user message (never a turn).
+ *
+ * Compresses both:
+ * - tool_result content in user messages (even indices)
+ * - tool_use inputs in assistant messages (odd indices) — these accumulate fast
  */
 function compressOldToolResults(messages: Anthropic.MessageParam[], keepTurns = 2): void {
-  // turns start at index 1 (assistant) + 2 (tool_results), each pair = 2 entries
   const turnCount = Math.floor((messages.length - 1) / 2);
   if (turnCount <= keepTurns) return;
 
   const compressUpTo = messages.length - keepTurns * 2 - 1;
-  for (let i = 2; i < compressUpTo; i += 2) {
-    // i = user/tool_results message of an old turn
-    const userMsg = messages[i];
-    if (!userMsg || !Array.isArray(userMsg.content)) continue;
-    userMsg.content = (userMsg.content as Anthropic.ToolResultBlockParam[]).map((block) => {
-      if (block.type !== "tool_result") return block;
-      const content = typeof block.content === "string" ? block.content : JSON.stringify(block.content);
-      if (content.length <= 300) return block;
-      return { ...block, content: `[compressed: ${content.length} chars — key data saved to notes]` };
-    });
+
+  for (let i = 1; i < compressUpTo; i++) {
+    const msg = messages[i];
+    if (!msg || !Array.isArray(msg.content)) continue;
+
+    if (i % 2 === 1) {
+      // Odd index = assistant message: compress tool_use inputs (keep thinking blocks intact)
+      msg.content = (msg.content as Anthropic.ContentBlock[]).map((block) => {
+        if (block.type !== "tool_use") return block;
+        const inputStr = JSON.stringify(block.input);
+        if (inputStr.length <= 200) return block;
+        return { ...block, input: { _compressed: `${inputStr.length} chars` } };
+      });
+    } else {
+      // Even index = user/tool_results message: compress tool_result content
+      msg.content = (msg.content as Anthropic.ToolResultBlockParam[]).map((block) => {
+        if (block.type !== "tool_result") return block;
+        const content = typeof block.content === "string" ? block.content : JSON.stringify(block.content);
+        if (content.length <= 300) return block;
+        return { ...block, content: `[compressed: ${content.length} chars — key data saved to notes]` };
+      });
+    }
   }
 }
 

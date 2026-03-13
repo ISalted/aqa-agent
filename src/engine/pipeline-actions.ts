@@ -270,11 +270,6 @@ export async function processCover(
     return methodResult;
   }
 
-  // ─── Validate (guardrails) — DISABLED temporarily ───────
-  transition(state, "validate", `code written for method=${method}, saving file`);
-  // TODO: re-enable guardrail check once pipeline is stable
-  // const codeValidation = validateGeneratedCode(writeResult.code);
-
   // ─── Save file ───────────────────────────────────────────
   mkdirSync(state.infrastructure!.testDir, { recursive: true });
   const testFilePath = join(state.infrastructure!.testDir, basename(planToUse.fileName));

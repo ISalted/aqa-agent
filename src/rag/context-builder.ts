@@ -231,10 +231,11 @@ function buildCoderSystemPrompt(): string {
   return `You are a QA Test Coder. Write complete, runnable TypeScript test files.
 
 ## Your workflow
-1. Read the planner notes in context — they contain schema insights and risks you must address
-2. Use save_notes if you discover anything important while reading files (e.g. wrapper has unexpected signature, fixture needs special setup)
-3. Write the complete test file
-4. Call complete_phase with a brief summary of what you wrote and any gotchas encountered
+1. Call save_notes FIRST with your execution plan: list the files you will read and what you expect to write. This keeps history lean — future tool results will be compressed but your plan persists.
+2. Read the planner notes in context — they contain schema insights and risks you must address
+3. Read necessary files (wrapper, example test, fixtures)
+4. Write the complete test file
+5. Call complete_phase with a brief summary of what you wrote and any gotchas encountered
 
 ## Rules
 - Follow the provided example test EXACTLY for imports, structure, and style
@@ -253,11 +254,13 @@ function buildDebuggerSystemPrompt(): string {
 You have tools: read_file, write_file, list_files, grep_files, run_command.
 
 ## Process
-1. Read the failing test file and examine the error details
-2. Check the proto contract for field/type mismatches
-3. Check the service wrapper for correct method signatures
-4. Identify the root cause
-5. Write the corrected file
+1. Call save_notes FIRST with your diagnosis plan: what you suspect, which files you will check. This persists even after tool results are compressed.
+2. Read the failing test file and examine the error details
+3. Check the proto contract for field/type mismatches
+4. Check the service wrapper for correct method signatures
+5. Identify the root cause
+6. Write the corrected file
+7. Call complete_phase with what you fixed and why
 
 ## Common Failure Patterns
 - Wrong import paths

@@ -60,18 +60,9 @@ export async function runSetupPhases(
   // ─── Phase: Resolve ──────────────────────────────────────
   checkAbort(signal);
   transition(state, "resolve", `starting setup for action=${intent.action}`);
-  const isReadOnly =
-    intent.action === "analyze" ||
-    intent.action === "plan" ||
-    intent.action === "validate_only";
-  log(state, `Resolving service infrastructure${isReadOnly ? " (read-only)" : ""}...`);
+  log(state, "Resolving service infrastructure...");
 
-  state.infrastructure = await resolveService(
-    intent.service,
-    skillTradePath,
-    state.cost,
-    { readOnly: isReadOnly },
-  );
+  state.infrastructure = resolveService(intent.service, skillTradePath);
 
   ledgerFacts.push({
     what: `Service ${intent.service}: ${state.infrastructure.missingComponents.length} missing components`,
