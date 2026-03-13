@@ -221,7 +221,7 @@ Return ONLY valid JSON — no markdown fences, no explanations:
 ## Rules
 - Always include a schema validation test first (id: PREFIX-001, type: schema, P1)
 - Minimum: 1 positive + 1 negative test case
-- Use a 3-letter uppercase prefix derived from the method name (e.g. GetMission → GMI)
+- Use EXACTLY 3 uppercase letters as prefix — never 4+. Take first letters of words: InsertOrReplaceMissionsGroup → IOR, InsertOrReplaceRewardPack → IRP, GetMission → GMI, CreateUser → CRU
 - P1 = critical (must have), P2 = important (should have), P3 = nice to have
 - 5-10 test cases total per method
 - Every test name must start with its full ID: "PREFIX-NNN: ..."`;

@@ -34,7 +34,7 @@ export function validatePlan(plan: TestPlan): GuardrailResult {
   }
 
   const allCases = [plan.schemaTest, ...plan.testCases];
-  const idPattern = /^[A-Z]{3,4}-\d{3}$/;
+  const idPattern = /^[A-Z]{3}-\d{3}$/;
   for (const tc of allCases) {
     if (!idPattern.test(tc.id)) {
       errors.push(`Test case ${tc.id || "<missing>"} must match ID format AAA-001`);
