@@ -8,7 +8,7 @@ export const PHASE_TRANSITIONS: Readonly<Record<Phase, readonly Phase[]>> = {
   init:      ["resolve", "failed"],
   resolve:   ["parse", "failed", "stopped"],
   parse:     ["coverage", "failed", "stopped"],
-  coverage:  ["plan", "implement", "validate", "done", "failed", "stopped"],
+  coverage:  ["plan", "done", "failed", "stopped"],
   plan:      ["plan", "implement", "save", "done", "failed", "stopped"],
   implement: ["implement", "validate", "plan", "save", "failed", "stopped"],
   validate:  ["validate", "plan", "implement", "debug", "save", "done", "failed", "stopped"],
