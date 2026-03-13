@@ -213,7 +213,8 @@ app.post("/api/chat", async (req, res) => {
   try {
     await ensureProtoSync();
     const result = await chatTurn(message, chatHistory, skillTradePath);
-    let responseType: "message" | "pipeline" = result.type;
+    // "clarification" is treated as a message from the API's perspective
+    let responseType: "message" | "pipeline" = result.type === "pipeline" ? "pipeline" : "message";
     let responseText = result.text;
     let responseIntent = result.intent;
 

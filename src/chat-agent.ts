@@ -13,7 +13,7 @@ import type { ParsedIntent } from "./types.js";
 const client = new Anthropic();
 
 export interface ChatResult {
-  type: "message" | "pipeline";
+  type: "message" | "pipeline" | "clarification";
   text: string;
   thinking?: string;
   intent?: ParsedIntent;
@@ -21,10 +21,12 @@ export interface ChatResult {
   _toolUseId?: string;
 }
 
+// ─── Tools ──────────────────────────────────────────────────
+
 const PIPELINE_TOOL: Anthropic.Tool = {
   name: "start_pipeline",
   description:
-    "Start the QA test automation pipeline. Call this when you clearly understand what the user wants.",
+    "Start the QA test automation pipeline. Call this when the user's intent is clear.",
   input_schema: {
     type: "object" as const,
     properties: {
@@ -32,7 +34,7 @@ const PIPELINE_TOOL: Anthropic.Tool = {
         type: "string",
         enum: ["cover", "analyze", "plan", "fix", "implement_only", "validate_only"],
         description:
-          "cover = full cycle (plan+write), analyze = coverage only, plan = plans only, fix = repair failures, implement_only = write from saved plans, validate_only = run tests only (no write/debug)",
+          "cover = full cycle (plan+write), analyze = coverage only, plan = plans only, fix = repair failures, implement_only = write from saved plans, validate_only = run tests only",
       },
       service: {
         type: "string",
@@ -41,12 +43,34 @@ const PIPELINE_TOOL: Anthropic.Tool = {
       methods: {
         type: "array",
         items: { type: "string" },
-        description: "Specific methods to process (optional, omit to process all uncovered)",
+        description: "Specific methods to process (optional — omit to process all)",
       },
     },
     required: ["action", "service"],
   },
 };
+
+const CLARIFY_TOOL: Anthropic.Tool = {
+  name: "ask_clarification",
+  description:
+    "Ask the user a clarifying question when the request is ambiguous. Use this when you are unsure which service, action, or methods the user wants.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      question: {
+        type: "string",
+        description: "The clarifying question to ask the user",
+      },
+      understood: {
+        type: "string",
+        description: "Brief summary of what you understood so far",
+      },
+    },
+    required: ["question"],
+  },
+};
+
+// ─── Context Helpers ────────────────────────────────────────
 
 function getAvailableServices(skillTradePath: string): string[] {
   const protoDir = join(skillTradePath, "lib/clients/gRPC/proto");
@@ -60,63 +84,63 @@ function buildSystemPrompt(skillTradePath: string): string {
   const services = getAvailableServices(skillTradePath);
   const index = loadProjectIndex();
   const lastPlan = loadLastPlanRun();
-  const lastImplement = loadLastImplementRun();
+  const lastImpl = loadLastImplementRun();
 
+  // Build service lines with coverage context
   const serviceLines = services
     .map((s) => {
       const info = index.services[s];
       if (info) {
-        return `  - ${s}: ${info.coveragePercent}% covered, methods: [${info.methods.join(", ")}]`;
+        const uncovered = info.methods.filter(
+          (m) => !info.testFiles.some((f) => f.toLowerCase().includes(m.toLowerCase())),
+        ).length;
+        return `  - ${s}: ${info.coveragePercent}% covered (${info.methods.length} methods, ~${uncovered} uncovered)`;
       }
-      return `  - ${s}: no coverage data yet`;
+      return `  - ${s}: not yet analyzed`;
     })
     .join("\n");
 
-  const lastPlanSection =
-    lastPlan && lastPlan.methods.length > 0
-      ? [
-          "",
-          "Last plan run (resumable):",
-          `  Service: ${lastPlan.service}. Methods with saved plans: ${lastPlan.methods.join(", ")}.`,
-          "  If user says \"реалізуй тести\" / \"тепер імплементуй\" → use action implement_only and this service.",
-        ].join("\n")
-      : "";
-
-  const lastImplementSection =
-    lastImplement && lastImplement.methods.length > 0
-      ? [
-          "",
-          "Last implement run (can validate):",
-          `  Service: ${lastImplement.service}. Test files: ${lastImplement.methods.length} method(s).`,
-          "  If user says \"запусти тести\" / \"завалідуй\" / \"run tests\" → use action validate_only and this service.",
-        ].join("\n")
-      : "";
+  // Build resumable context section (only if relevant)
+  const resumeLines: string[] = [];
+  if (lastPlan && lastPlan.methods.length > 0) {
+    resumeLines.push(
+      `Last plan run — service: ${lastPlan.service}, saved plans for: ${lastPlan.methods.join(", ")}.`,
+      `  → If user says "реалізуй" / "implement" → action: implement_only, service: ${lastPlan.service}`,
+    );
+  }
+  if (lastImpl && lastImpl.methods.length > 0) {
+    resumeLines.push(
+      `Last implement run — service: ${lastImpl.service}, ${lastImpl.methods.length} test file(s) written.`,
+      `  → If user says "запусти тести" / "run tests" → action: validate_only, service: ${lastImpl.service}`,
+    );
+  }
 
   return [
     "You are AQA Agent — an AI test automation assistant for gRPC services (Playwright + TypeScript).",
     "",
-    "Available services:",
-    serviceLines,
+    "## Available Services",
+    serviceLines || "  (no services found — SKILL_TRADE_PATH may be wrong)",
     "",
-    "Available actions:",
-    "  - cover: full cycle — plan + write tests for uncovered methods",
-    "  - analyze: coverage report only",
-    "  - plan: generate test plans only (saves for implement_only)",
-    "  - fix: repair failing tests (run + debug)",
-    "  - implement_only: write tests using saved plans (after plan run)",
-    "  - validate_only: run tests only, no write/debug (after implement)",
-    lastPlanSection,
-    lastImplementSection,
+    "## Available Actions",
+    "  cover         — full cycle: plan + write tests for uncovered methods",
+    "  analyze       — coverage report only, no implementation",
+    "  plan          — generate test plans only (saves them for implement_only)",
+    "  fix           — repair failing tests (run + debug loop)",
+    "  implement_only — write tests from previously saved plans",
+    "  validate_only — run tests only, no write or debug",
+    ...(resumeLines.length > 0 ? ["", "## Resumable Context", ...resumeLines] : []),
     "",
-    "Rules:",
-    "- If user just ran plan and asks to implement (\"реалізуй тести\", \"тепер імплементуй\") → use implement_only for that service.",
-    "- If user asks to run/validate tests (\"запусти тести\", \"завалідуй\") and we have last implement run → use validate_only for that service.",
-    "- If user clearly asks for analyze, plan, cover, fix, implement, or validate for a service → call start_pipeline immediately with that action and exact service name.",
-    "- Match the service name EXACTLY from the list above.",
+    "## Behavior Rules",
+    "- Call start_pipeline immediately when the user's intent is clear.",
+    "- Use ask_clarification when the service or action is genuinely ambiguous.",
+    "- For compound requests (e.g. 'analyze AND implement') → use action: cover.",
+    "- Match service names EXACTLY from the list above.",
     "- Respond in the same language the user writes in.",
     "- Be concise.",
   ].join("\n");
 }
+
+// ─── Response Helpers ────────────────────────────────────────
 
 function extractText(content: Anthropic.ContentBlock[]): string {
   return content
@@ -135,6 +159,8 @@ function extractThinking(content: Anthropic.ContentBlock[]): string | undefined 
   return thinking || undefined;
 }
 
+// ─── Main Chat Turn ─────────────────────────────────────────
+
 export async function chatTurn(
   userMessage: string,
   history: Anthropic.MessageParam[],
@@ -150,18 +176,18 @@ export async function chatTurn(
     max_tokens: 4096,
     system: buildSystemPrompt(skillTradePath),
     messages,
-    tools: [PIPELINE_TOOL],
+    tools: [PIPELINE_TOOL, CLARIFY_TOOL],
     thinking: { type: "enabled", budget_tokens: 2048 },
   });
 
-  const toolUse = response.content.find(
-    (b): b is Anthropic.ToolUseBlock => b.type === "tool_use",
-  );
-
   const thinking = extractThinking(response.content);
 
-  if (toolUse && toolUse.name === "start_pipeline") {
-    const input = toolUse.input as {
+  // Check for pipeline start
+  const pipelineTool = response.content.find(
+    (b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name === "start_pipeline",
+  );
+  if (pipelineTool) {
+    const input = pipelineTool.input as {
       action: string;
       service: string;
       methods?: string[];
@@ -177,10 +203,27 @@ export async function chatTurn(
         raw: userMessage,
       },
       _rawContent: response.content,
-      _toolUseId: toolUse.id,
+      _toolUseId: pipelineTool.id,
     };
   }
 
+  // Check for clarification question
+  const clarifyTool = response.content.find(
+    (b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name === "ask_clarification",
+  );
+  if (clarifyTool) {
+    const input = clarifyTool.input as { question: string; understood?: string };
+    const prefix = input.understood ? `${input.understood}\n\n` : "";
+    return {
+      type: "clarification",
+      text: prefix + input.question,
+      thinking,
+      _rawContent: response.content,
+      _toolUseId: clarifyTool.id,
+    };
+  }
+
+  // Plain message
   return {
     type: "message",
     text: extractText(response.content) || "I'm not sure what you mean. Could you clarify?",

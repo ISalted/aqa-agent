@@ -14,6 +14,7 @@ import type {
   ClassifiedFailure,
   FailureClass,
   GuardrailResult,
+  StepNote,
 } from "../types.js";
 import { TOOLS_FOR_AGENT } from "../tools/index.js";
 
@@ -35,6 +36,7 @@ export async function debugTests(
   testResult: TestResult,
   skillTradePath: string,
   costAccumulator: CostAccumulator,
+  notes: StepNote[] = [],
 ): Promise<DebugResult> {
   const classified = classifyFailures(testResult);
 
@@ -50,7 +52,7 @@ export async function debugTests(
 
   const model = getModelForAgent("debugger");
   const context = buildDebuggerContext(contract, coverage, skillTradePath);
-  const userMessage = buildDebugPrompt(testFile, testResult, classified, skillTradePath);
+  const userMessage = formatNotes(notes) + buildDebugPrompt(testFile, testResult, classified, skillTradePath);
 
   const result = await agenticLoop({
     model,
@@ -88,6 +90,13 @@ export async function debugTests(
   const guardrailResult = code ? validateGeneratedCode(code) : null;
 
   return { fixedCode: code, failures: classified, guardrailResult };
+}
+
+function formatNotes(notes: StepNote[]): string {
+  if (notes.length === 0) return "";
+  return "## Context from previous steps:\n" +
+    notes.map((n) => `[${n.phase.toUpperCase()}] ${n.summary}`).join("\n") +
+    "\n\n";
 }
 
 function classifyFailures(testResult: TestResult): ClassifiedFailure[] {
