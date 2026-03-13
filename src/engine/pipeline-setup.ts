@@ -46,6 +46,10 @@ export async function runSetupPhases(
     state.coverage = analyzeCoverage(state.contract, skillTradePath);
     log(state, "Using saved plan context (skipping resolve/parse/coverage)");
 
+    transition(state, "resolve",   "restored from saved plan");
+    transition(state, "parse",     "restored from saved plan");
+    transition(state, "coverage",  "restored from saved plan");
+    transition(state, "plan",      "restored from saved plan");
     for (const phase of ["resolve", "parse", "coverage", "plan"] as const) {
       emitPipelineEvent("log", state.runId, { phase, message: "(restored from saved plan)", elapsed: 0, cost: 0 });
       emitPipelineEvent("phase", state.runId, { phase, status: "complete" });
