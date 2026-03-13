@@ -8,6 +8,7 @@ import type {
   TestPlan,
   CostAccumulator,
   GuardrailResult,
+  StepNote,
 } from "../types.js";
 
 export interface PlanTestsResult {
@@ -15,6 +16,8 @@ export interface PlanTestsResult {
   guardrailResult: GuardrailResult | null;
   error?: string;
   thinking?: string;
+  savedNotes?: string[];
+  phaseSummary?: string;
 }
 
 /**
@@ -27,11 +30,12 @@ export async function planTests(
   method: string,
   skillTradePath: string,
   costAccumulator: CostAccumulator,
+  notes: StepNote[] = [],
 ): Promise<PlanTestsResult> {
   const model = getModelForAgent("planner");
   const context = buildPlannerContext(contract, coverage, method, skillTradePath);
 
-  const userMessage = buildPlannerPrompt(contract, coverage, method, context);
+  const userMessage = formatNotes(notes) + buildPlannerPrompt(contract, coverage, method, context);
 
   const result = await agenticLoop({
     model,
@@ -39,10 +43,11 @@ export async function planTests(
     userMessage,
     tools: [],
     effort: "medium",
-    maxTurns: 1,
+    maxTurns: 3,
     costAccumulator,
     agentName: "planner",
     stepName: `plan:${method}`,
+    enablePhaseTools: true,
   });
 
   if (result.abortReason) {
@@ -55,11 +60,12 @@ export async function planTests(
       plan: null,
       guardrailResult: null,
       error: `Failed to parse plan JSON from LLM response`,
+      savedNotes: result.savedNotes,
     };
   }
 
   const guardrailResult = validatePlan(plan);
-  return { plan, guardrailResult, thinking: result.thinking };
+  return { plan, guardrailResult, thinking: result.thinking, savedNotes: result.savedNotes, phaseSummary: result.phaseSummary };
 }
 
 function buildPlannerPrompt(
@@ -126,6 +132,13 @@ type AgentContextLocal = {
   wrapperCode?: string | null;
   projectRules: string;
 };
+
+function formatNotes(notes: StepNote[]): string {
+  if (notes.length === 0) return "";
+  return "## Context from previous steps:\n" +
+    notes.map((n) => `[${n.phase.toUpperCase()}] ${n.summary}`).join("\n") +
+    "\n\n";
+}
 
 function extractJson<T>(text: string): T | null {
   try {

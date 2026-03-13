@@ -6,6 +6,7 @@ import type {
   CoverageReport,
   AgentContext,
   FailurePattern,
+  RunNotes,
 } from "../types.js";
 import { loadFailurePatterns } from "../memory/failure-patterns.js";
 
@@ -14,12 +15,14 @@ const KB_DIR = resolve(import.meta.dirname, "../../kb");
 /**
  * File-based RAG — assembles relevant context for LLM agents.
  * No vector DB: we know the domain, so we select files deterministically.
+ * RunNotes carry natural-language summaries from previous phases.
  */
 export function buildPlannerContext(
   contract: NormalizedContract,
   coverage: CoverageReport,
   method: string,
   skillTradePath: string,
+  notes?: RunNotes,
 ): AgentContext {
   const skills = loadSkills(["grpc-patterns", "schema-validation", "data-generation"]);
   const projectRules = loadProjectRules(skillTradePath);
@@ -38,6 +41,7 @@ export function buildPlannerContext(
     wrapperCode: wrapperCode ?? undefined,
     failurePatterns: failurePatterns.filter((p) => p.occurrences > 1),
     projectRules,
+    runNotes: buildPlannerRunNotes(notes),
   };
 }
 
@@ -46,6 +50,7 @@ export function buildCoderContext(
   coverage: CoverageReport,
   method: string,
   skillTradePath: string,
+  notes?: RunNotes,
 ): AgentContext {
   const skills = loadSkills([
     "grpc-patterns",
@@ -65,6 +70,7 @@ export function buildCoderContext(
     exampleTest: exampleTest ?? undefined,
     wrapperCode: wrapperCode ?? undefined,
     projectRules,
+    runNotes: buildCoderRunNotes(notes, method),
   };
 }
 
@@ -84,6 +90,28 @@ export function buildDebuggerContext(
     failurePatterns,
     projectRules,
   };
+}
+
+// ─── Run Notes Builders ─────────────────────────────────────
+// These assemble natural-language context from structured phase outputs.
+
+function buildPlannerRunNotes(notes?: RunNotes): string | undefined {
+  if (!notes) return undefined;
+  const parts: string[] = [];
+  if (notes.infrastructure) parts.push(notes.infrastructure);
+  if (notes.coverage) parts.push(notes.coverage);
+  return parts.length > 0 ? parts.join("\n\n") : undefined;
+}
+
+function buildCoderRunNotes(notes?: RunNotes, method?: string): string | undefined {
+  if (!notes) return undefined;
+  const parts: string[] = [];
+  if (notes.infrastructure) parts.push(notes.infrastructure);
+  if (notes.coverage) parts.push(notes.coverage);
+  if (method && notes.methodNotes[method]?.plan) {
+    parts.push(`## Plan Notes\n${notes.methodNotes[method].plan}`);
+  }
+  return parts.length > 0 ? parts.join("\n\n") : undefined;
 }
 
 // ─── Skill Loader ───────────────────────────────────────────
@@ -168,65 +196,72 @@ function extractMethodSection(protoContent: string, method: string): string | nu
 // ─── System Prompts ─────────────────────────────────────────
 
 function buildPlannerSystemPrompt(): string {
-  return `You are a QA Test Planner for a gRPC test automation framework.
-Your job: given a proto contract and existing coverage, produce a test plan in JSON.
+  return `You are a QA Test Planner for an automated RPC test framework.
+Plan test cases for a single method based on the provided contract.
 
-Output ONLY valid JSON matching this schema:
+## Your workflow
+1. Analyse the proto schema carefully — look for required/optional fields, oneofs, enums, repeated fields, complex types
+2. Call save_notes with your key findings (schema complexity, tricky fields, edge cases, risks). These notes travel to the implementer.
+3. Return the test plan JSON
+
+## Notes format (save_notes)
+Write concise, specific insights the implementer needs. Example:
+"oneof identity (email|phone) — both paths must be tested. user_id is UUID — use generateUUID(). status enum has 4 values including UNKNOWN — boundary test needed. deadline is optional int64 — test null vs zero vs past."
+
+## Output Format
+Return ONLY valid JSON — no markdown fences, no explanations:
 {
   "service": "string",
   "method": "string",
   "fileName": "string (camelCase like methodName.test.ts)",
-  "schemaTest": { "id": "string", "type": "schema", "priority": "P1", "name": "string", "description": "string", "expectedBehavior": "string" },
-  "testCases": [{ "id": "string", "type": "positive|negative|boundary|edge", "priority": "P1|P2|P3", "name": "string", "description": "string", "expectedBehavior": "string" }]
+  "schemaTest": { "id": "PREFIX-001", "type": "schema", "priority": "P1", "name": "PREFIX-001: Schema validation for ...", "description": "string", "expectedBehavior": "string" },
+  "testCases": [{ "id": "PREFIX-NNN", "type": "positive|negative|boundary|edge", "priority": "P1|P2|P3", "name": "PREFIX-NNN: ...", "description": "string", "expectedBehavior": "string" }]
 }
 
-Rules:
-- ALWAYS include a schema validation test (type: "schema", P1) as the first test
-- Include at least 1 positive and 1 negative test case
-- Each test must have a clear expectedBehavior
-- Use project naming conventions (camelCase file names)
-- Use a 3-letter uppercase mnemonic ID prefix plus 3-digit numbering for ALL test cases
-- Schema test must be "PREFIX-001", next cases "PREFIX-002", "PREFIX-003", ...
-- Every test name must start with its ID, e.g. "UCW-001: Schema validation for UpdateClientWallet response"
-- Do NOT use titles like "Schema | ...", "Positive | ...", or unnumbered names
-- P1 = must have, P2 = should have, P3 = nice to have
-- Keep plans focused: 5-10 test cases per method`;
+## Rules
+- Always include a schema validation test first (id: PREFIX-001, type: schema, P1)
+- Minimum: 1 positive + 1 negative test case
+- Use a 3-letter uppercase prefix derived from the method name (e.g. GetMission → GMI)
+- P1 = critical (must have), P2 = important (should have), P3 = nice to have
+- 5-10 test cases total per method
+- Every test name must start with its full ID: "PREFIX-NNN: ..."`;
 }
 
 function buildCoderSystemPrompt(): string {
-  return `You are a QA Test Coder for a Playwright + gRPC + TypeScript framework.
-Your job: write complete, runnable test files following project patterns exactly.
+  return `You are a QA Test Coder. Write complete, runnable TypeScript test files.
 
-Rules:
-- Use the provided example test as a template for imports, structure, and style
+## Your workflow
+1. Read the planner notes in context — they contain schema insights and risks you must address
+2. Use save_notes if you discover anything important while reading files (e.g. wrapper has unexpected signature, fixture needs special setup)
+3. Write the complete test file
+4. Call complete_phase with a brief summary of what you wrote and any gotchas encountered
+
+## Rules
+- Follow the provided example test EXACTLY for imports, structure, and style
 - Schema validation test MUST use ts-interface-checker (createCheckers)
-- Use generateProcessId() or generateUUID() for unique test data — NEVER hardcode
-- Each test must be independent — no shared mutable state
-- Use proper error handling with gRPC error types
-- Follow the exact import paths from the example
-- Use the test case IDs from the provided plan exactly as written
-- Every generated test title must start with "{PREFIX}-{NNN}:"
-- Write complete files — never partial code
+- Use generateProcessId() or generateUUID() for unique IDs — NEVER hardcode values
+- Each test must be self-contained — no shared mutable state between tests
+- Use the exact test case IDs from the plan in every test title
+- Write the COMPLETE file — no partial code, no TODOs, no placeholder comments
 
-Output ONLY the complete TypeScript test file content. No explanations.`;
+Output ONLY the complete TypeScript file content. No explanations, no markdown fences.`;
 }
 
 function buildDebuggerSystemPrompt(): string {
-  return `You are a QA Test Debugger for a Playwright + gRPC + TypeScript framework.
-Your job: diagnose why a test is failing and produce a fix.
+  return `You are a QA Test Debugger. Diagnose failing tests and produce fixes.
 
-You have access to tools: read_file, write_file, list_files, grep_files, run_command.
+You have tools: read_file, write_file, list_files, grep_files, run_command.
 
-Process:
-1. Read the failing test file and error details
-2. Check the proto contract for any mismatches
-3. Check the service wrapper for method signatures
+## Process
+1. Read the failing test file and examine the error details
+2. Check the proto contract for field/type mismatches
+3. Check the service wrapper for correct method signatures
 4. Identify the root cause
 5. Write the corrected file
 
-Common failure patterns:
+## Common Failure Patterns
 - Wrong import paths
-- Incorrect gRPC method call signature
+- Incorrect RPC method call signature
 - Missing or wrong field names (proto vs generated types mismatch)
 - Wrong error type assertions
 - Stale generated types (need proto rebuild)`;

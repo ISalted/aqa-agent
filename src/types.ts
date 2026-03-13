@@ -198,6 +198,11 @@ export type Phase =
   | "failed"
   | "stopped";
 
+export interface StepNote {
+  phase: Phase;
+  summary: string;
+}
+
 export interface RunState {
   runId: string;
   startedAt: string;
@@ -212,6 +217,7 @@ export interface RunState {
   cost: CostAccumulator;
   retries: number;
   maxRetries: number;
+  notes: StepNote[];
 }
 
 export interface MethodResult {
@@ -395,6 +401,12 @@ export interface LedgerAttempt {
 
 // ─── RAG Context ────────────────────────────────────────────
 
+export interface RunNotes {
+  infrastructure?: string;
+  coverage?: string;
+  methodNotes: Record<string, { plan?: string }>;
+}
+
 export interface AgentContext {
   systemPrompt: string;
   skills: string[];
@@ -403,6 +415,7 @@ export interface AgentContext {
   wrapperCode?: string;
   failurePatterns?: FailurePattern[];
   projectRules: string;
+  runNotes?: string;
 }
 
 // ─── Config ─────────────────────────────────────────────────

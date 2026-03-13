@@ -9,6 +9,7 @@ import type {
   TestPlan,
   CostAccumulator,
   GuardrailResult,
+  StepNote,
 } from "../types.js";
 import { TOOLS_FOR_AGENT } from "../tools/index.js";
 
@@ -17,6 +18,8 @@ export interface WriteTestsResult {
   guardrailResult: GuardrailResult | null;
   error?: string;
   thinking?: string;
+  savedNotes?: string[];
+  phaseSummary?: string;
 }
 
 /**
@@ -31,10 +34,11 @@ export async function writeTests(
   skillTradePath: string,
   costAccumulator: CostAccumulator,
   testDir: string,
+  notes: StepNote[] = [],
 ): Promise<WriteTestsResult> {
   const model = getModelForAgent("coder");
   const context = buildCoderContext(contract, coverage, plan.method, skillTradePath);
-  const userMessage = buildCoderPrompt(plan, context, skillTradePath, testDir);
+  const userMessage = formatNotes(notes) + buildCoderPrompt(plan, context, skillTradePath, testDir);
 
   const result = await agenticLoop({
     model,
@@ -46,6 +50,7 @@ export async function writeTests(
     costAccumulator,
     agentName: "coder",
     stepName: `write:${plan.method}`,
+    enablePhaseTools: true,
   });
 
   if (result.abortReason) {
@@ -62,11 +67,13 @@ export async function writeTests(
       guardrailResult: null,
       error: "Failed to extract code from LLM response",
       thinking: result.thinking,
+      savedNotes: result.savedNotes,
+      phaseSummary: result.phaseSummary,
     };
   }
 
   const guardrailResult = validateGeneratedCode(code);
-  return { code, guardrailResult, thinking: result.thinking };
+  return { code, guardrailResult, thinking: result.thinking, savedNotes: result.savedNotes, phaseSummary: result.phaseSummary };
 }
 
 function buildCoderPrompt(
@@ -139,6 +146,13 @@ type AgentContextLocal = {
   wrapperCode?: string | null;
   projectRules: string;
 };
+
+function formatNotes(notes: StepNote[]): string {
+  if (notes.length === 0) return "";
+  return "## Context from previous steps:\n" +
+    notes.map((n) => `[${n.phase.toUpperCase()}] ${n.summary}`).join("\n") +
+    "\n\n";
+}
 
 function extractCodeBlock(text: string): string | null {
   const codeBlockMatch = text.match(/```(?:typescript|ts)?\n([\s\S]*?)```/);
