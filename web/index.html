@@ -29,7 +29,6 @@
       --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       --chat-width: 520px;
       --right-width: 280px;
-      --methods-height: 260px;
       --history-height: 180px;
     }
 
@@ -48,7 +47,8 @@
 
     header {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 20px; background: var(--bg-1); border-bottom: 1px solid var(--border); flex-shrink: 0;
+      padding: 8px 16px; background: var(--bg-1); border-bottom: 1px solid var(--border);
+      flex-shrink: 0; min-height: 0; overflow: hidden;
     }
     .header-left { display: flex; align-items: center; gap: 10px; }
     .logo { font-size: 22px; color: var(--accent); }
@@ -288,6 +288,7 @@
     .pipeline-phase.active { background: var(--accent-dim); border-color: var(--accent); }
     .pipeline-phase.complete { border-color: rgba(16,185,129,.3); }
     .pipeline-phase.failed { border-color: var(--error); background: var(--error-dim); }
+    .pipeline-phase.selected { background: var(--accent-dim); border-color: var(--accent); }
 
     .phase-icon {
       width: 22px; height: 22px; border-radius: 50%;
@@ -307,6 +308,35 @@
       flex-shrink: 0; min-width: 52px; text-align: right; padding-right: 2px;
     }
     .pipeline-phase.complete .phase-cost { color: var(--success); }
+
+    /* ─── Header pipeline: horizontal stepper ─── */
+    header {
+      flex-wrap: nowrap;
+    }
+    .header-pipeline {
+      display: flex; align-items: center; gap: 0;
+      flex: 1; justify-content: center; overflow: hidden;
+    }
+    .header-pipeline .pipeline {
+      flex-direction: row; align-items: center; gap: 0;
+    }
+    .header-pipeline .pipeline-phase {
+      flex-direction: column; align-items: center; text-align: center;
+      background: transparent; padding: 5px 10px; gap: 4px;
+      border-radius: 6px; cursor: pointer; min-width: 72px; position: relative;
+    }
+    .header-pipeline .pipeline-phase + .pipeline-phase::before {
+      content: ''; position: absolute; left: -8px; top: 14px;
+      width: 16px; height: 1px; background: var(--border);
+    }
+    .header-pipeline .pipeline-phase.complete + .pipeline-phase::before { background: rgba(16,185,129,.4); }
+    .header-pipeline .pipeline-phase:hover { background: var(--bg-3); }
+    .header-pipeline .phase-body { display: flex; flex-direction: column; align-items: center; }
+    .header-pipeline .phase-label { font-size: 11px; font-weight: 500; }
+    .header-pipeline .phase-detail { font-size: 10px; max-width: 90px; }
+    .header-pipeline .phase-cost { display: none; }
+    .header-pipeline .phase-icon { width: 18px; height: 18px; font-size: 9px; }
+    .header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
     /* Log */
     .log-section {
@@ -408,16 +438,72 @@
     .plan-case-title { color: var(--text-2); }
     .plan-case-meta { color: var(--text-4); font-family: var(--mono); font-size: 10px; }
 
-    .content-center .methods-section {
-      flex: 0 0 var(--methods-height);
-      min-height: 140px;
-    }
     .content-sidebar .pipeline-section {
       flex: 1;
       overflow-y: auto;
       padding: 0 14px 10px;
       border-top: 1px solid var(--border);
     }
+
+    /* ─── inspector-and-chat: center column wrapper ─── */
+    .inspector-and-chat {
+      display: flex; flex-direction: column; overflow: hidden;
+      background: var(--bg-1); border-left: 1px solid var(--border);
+      min-width: 300px;
+    }
+    .inspector-and-chat .sidebar {
+      border-left: none;
+      flex: 1;
+    }
+    .inspector-and-chat .methods-section {
+      flex: 0 0 var(--inspector-height, 220px);
+      min-height: 100px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ─── Phase Inspector tabs ─── */
+    .inspector-tabs {
+      display: flex; gap: 2px; padding: 6px 10px 0;
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .inspector-tab {
+      font-size: 11px; font-weight: 500; padding: 4px 10px;
+      background: transparent; border: none; border-bottom: 2px solid transparent;
+      color: var(--text-4); cursor: pointer; transition: color .15s, border-color .15s;
+      margin-bottom: -1px;
+    }
+    .inspector-tab:hover { color: var(--text-2); }
+    .inspector-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    .inspector-subtitle {
+      font-size: 11px; color: var(--text-4); margin-left: 6px;
+    }
+    .inspector-content {
+      flex: 1; overflow-y: auto;
+    }
+    .inspector-overview {
+      padding: 10px 14px;
+    }
+    .inspector-status {
+      display: flex; align-items: center; gap: 6px;
+      margin-bottom: 8px; font-size: 12px;
+    }
+    .inspector-summary {
+      font-size: 11.5px; color: var(--text-3); font-family: var(--mono);
+      background: var(--bg-2); border-radius: 4px; padding: 6px 10px;
+      line-height: 1.6; word-break: break-word;
+    }
+    .inspector-messages {
+      padding: 4px 14px; font-family: var(--mono); font-size: 11.5px; line-height: 1.7;
+    }
+    .inspector-request {
+      padding: 14px; font-size: 12px;
+    }
+    .inspector-request-row {
+      display: flex; gap: 8px; margin-bottom: 8px; align-items: baseline;
+    }
+    .inspector-request-key { color: var(--text-4); flex-shrink: 0; min-width: 60px; }
+    .inspector-request-val { color: var(--text-1); font-family: var(--mono); word-break: break-all; }
 
     footer {
       padding: 6px 20px; background: var(--bg-1); border-top: 1px solid var(--border);
@@ -444,22 +530,28 @@
         <span class="subtitle">Test Automation Engine</span>
       </div>
     </div>
-    <span id="connStatus" class="badge connecting">connecting</span>
+    <div class="header-pipeline">
+      <div class="pipeline" id="pipeline">
+        <div class="pipeline-phase" data-phase="resolve" onclick="selectPhase('resolve')"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Resolve</div><div class="phase-detail">Find service infrastructure</div></div><span class="phase-cost" data-cost-phase="resolve"></span></div>
+        <div class="pipeline-phase" data-phase="parse" onclick="selectPhase('parse')"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Parse</div><div class="phase-detail">Parse proto contract</div></div><span class="phase-cost" data-cost-phase="parse"></span></div>
+        <div class="pipeline-phase" data-phase="coverage" onclick="selectPhase('coverage')"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Coverage</div><div class="phase-detail">Analyze test coverage</div></div><span class="phase-cost" data-cost-phase="coverage"></span></div>
+        <div class="pipeline-phase" data-phase="plan" onclick="selectPhase('plan')"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Plan</div><div class="phase-detail">Generate test plans</div></div><span class="phase-cost" data-cost-phase="plan"></span></div>
+        <div class="pipeline-phase" data-phase="implement" onclick="selectPhase('implement')"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Implement</div><div class="phase-detail">Write test code</div></div><span class="phase-cost" data-cost-phase="implement"></span></div>
+        <div class="pipeline-phase" data-phase="validate" onclick="selectPhase('validate')"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Validate</div><div class="phase-detail">Run tests</div></div><span class="phase-cost" data-cost-phase="validate"></span></div>
+        <div class="pipeline-phase" data-phase="debug" onclick="selectPhase('debug')"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Debug</div><div class="phase-detail">Fix failures</div></div><span class="phase-cost" data-cost-phase="debug"></span></div>
+        <div class="pipeline-phase" data-phase="done" onclick="selectPhase('done')"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Complete</div><div class="phase-detail">Pipeline finished</div></div><span class="phase-cost" data-cost-phase="done"></span></div>
+      </div>
+    </div>
+    <div class="header-right">
+      <span id="pipelineStatus" class="count-badge">idle</span>
+      <button id="stopBtn" onclick="abortPipeline()" title="Stop pipeline" class="stop-btn">■ stop</button>
+      <span id="connStatus" class="badge connecting">connecting</span>
+    </div>
   </header>
 
   <main>
-    <!-- Left: methods + log + history -->
+    <!-- Left: log + history -->
     <div class="content-center">
-      <div class="methods-section">
-        <div class="section-header">
-          <h2>Methods</h2>
-          <span id="methodCount" class="count-badge">0</span>
-        </div>
-        <div id="methodsList" class="methods-list"><div class="empty-state">No active run</div></div>
-      </div>
-
-      <div id="methodsResizer" class="section-resizer" aria-label="Resize methods and log"></div>
-
       <div class="log-section">
         <div class="section-header">
           <h2>Live Log</h2>
@@ -481,18 +573,40 @@
 
     <div id="panelResizer" class="panel-resizer" aria-label="Resize panels"></div>
 
-    <!-- Middle: chat -->
-    <aside class="sidebar">
-      <div class="chat-header">
-        <h2>Chat</h2>
-        <button class="btn-clear" onclick="clearChat()">Clear</button>
+    <!-- Middle: Phase Inspector + Chat -->
+    <div class="inspector-and-chat">
+      <div class="methods-section" id="phaseInspector">
+        <div class="section-header">
+          <div style="display:flex;align-items:baseline;gap:6px">
+            <h2>Phase Inspector</h2>
+            <span id="inspectorSubtitle" class="inspector-subtitle">No phase selected</span>
+          </div>
+        </div>
+        <div class="inspector-tabs">
+          <button class="inspector-tab active" data-tab="overview" onclick="switchInspectorTab('overview')">Overview</button>
+          <button class="inspector-tab" data-tab="output" onclick="switchInspectorTab('output')">Output</button>
+          <button class="inspector-tab" data-tab="messages" onclick="switchInspectorTab('messages')">Messages</button>
+          <button class="inspector-tab" data-tab="request" onclick="switchInspectorTab('request')">Request</button>
+        </div>
+        <div id="inspectorContent" class="inspector-content">
+          <div class="empty-state">Select a phase from the header pipeline to inspect details.</div>
+        </div>
       </div>
-      <div class="chat-messages" id="chatMessages"></div>
-      <div class="chat-input-area">
-        <textarea id="chatInput" rows="2" placeholder="e.g. plan tests for MissionEngine"></textarea>
-        <button class="btn-send" id="sendBtn" onclick="sendMessage()">↑</button>
-      </div>
-    </aside>
+
+      <div id="inspectorResizer" class="section-resizer" aria-label="Resize inspector and chat"></div>
+
+      <aside class="sidebar">
+        <div class="chat-header">
+          <h2>Chat</h2>
+          <button class="btn-clear" onclick="clearChat()">Clear</button>
+        </div>
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="chat-input-area">
+          <textarea id="chatInput" rows="2" placeholder="e.g. plan tests for MissionEngine"></textarea>
+          <button class="btn-send" id="sendBtn" onclick="sendMessage()">↑</button>
+        </div>
+      </aside>
+    </div>
 
     <div id="rightPanelResizer" class="panel-resizer" aria-label="Resize chat and cost"></div>
 
@@ -506,25 +620,6 @@
         <div class="token-total" id="tokenTotal">0</div>
         <div class="token-label">total tokens</div>
         <div id="costBreakdown" class="cost-breakdown"></div>
-      </div>
-      <div class="pipeline-section">
-        <div class="section-header">
-          <h2>Pipeline</h2>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span id="pipelineStatus" class="count-badge">idle</span>
-            <button id="stopBtn" onclick="abortPipeline()" title="Stop pipeline" class="stop-btn">■ stop</button>
-          </div>
-        </div>
-        <div class="pipeline" id="pipeline">
-          <div class="pipeline-phase" data-phase="resolve"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Resolve</div><div class="phase-detail">Find service infrastructure</div></div><span class="phase-cost" data-cost-phase="resolve"></span></div>
-          <div class="pipeline-phase" data-phase="parse"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Parse</div><div class="phase-detail">Parse proto contract</div></div><span class="phase-cost" data-cost-phase="parse"></span></div>
-          <div class="pipeline-phase" data-phase="coverage"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Coverage</div><div class="phase-detail">Analyze test coverage</div></div><span class="phase-cost" data-cost-phase="coverage"></span></div>
-          <div class="pipeline-phase" data-phase="plan"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Plan</div><div class="phase-detail">Generate test plans</div></div><span class="phase-cost" data-cost-phase="plan"></span></div>
-          <div class="pipeline-phase" data-phase="implement"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Implement</div><div class="phase-detail">Write test code</div></div><span class="phase-cost" data-cost-phase="implement"></span></div>
-          <div class="pipeline-phase" data-phase="validate"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Validate</div><div class="phase-detail">Run tests</div></div><span class="phase-cost" data-cost-phase="validate"></span></div>
-          <div class="pipeline-phase" data-phase="debug"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Debug</div><div class="phase-detail">Fix failures</div></div><span class="phase-cost" data-cost-phase="debug"></span></div>
-          <div class="pipeline-phase" data-phase="done"><div class="phase-icon">○</div><div class="phase-body"><div class="phase-label">Complete</div><div class="phase-detail">Pipeline finished</div></div><span class="phase-cost" data-cost-phase="done"></span></div>
-        </div>
       </div>
     </div>
   </main>
@@ -548,6 +643,10 @@
     let logCount = 0;
     let services = [];
     let protoSyncReport = null;
+    let selectedPhase = null;
+    let activeInspectorTab = 'overview';
+    let currentIntent = null;
+    const phaseData = {}; // { [phase]: { status, messages: [{elapsed, message, isThinking}], summary } }
     const CHAT_STORAGE_KEY = 'aqa-agent-chat-v1';
     const CHAT_BOOT_KEY = 'aqa-agent-chat-boot-id';
     const DASHBOARD_STORAGE_KEY = 'aqa-agent-dashboard-v1';
@@ -590,6 +689,11 @@
       $('footerLeft').textContent = `Running: ${ev.data.service}`;
       $('footerRight').textContent = '';
       activePhase = null; completedPhases.clear(); logCount = 0;
+      currentIntent = ev.data;
+      for (const k in phaseData) delete phaseData[k];
+      selectedPhase = null;
+      document.querySelectorAll('.pipeline-phase').forEach(el => el.classList.remove('selected'));
+      renderInspector();
       resetPipeline();
       $('logStream').innerHTML = '';
       $('logCount').textContent = '0';
@@ -602,6 +706,12 @@
 
     function onLog(ev) {
       const { phase, message, elapsed, cost, isThinking } = ev.data;
+      // Store message in phaseData for inspector
+      const pd = ensurePhaseData(phase);
+      pd.messages.push({ elapsed: elapsed ?? '0.0', message, isThinking: !!isThinking });
+      if (!isThinking) pd.summary = message;
+      if (selectedPhase === phase) renderInspectorTabContent();
+
       if (!isThinking) {
         if (phase !== activePhase && phase !== 'init' && phase !== 'save' && phase !== 'report') {
           if (activePhase) markPhase(activePhase, 'complete');
@@ -619,14 +729,24 @@
       const method = ev.data.method;
       if (!method) return;
 
+      // Update global methods list (left panel)
       const current = loadDashboardState();
       const methods = Array.isArray(current.methods) ? current.methods : [];
       const idx = methods.findIndex(m => m.method === method.method);
       if (idx >= 0) methods[idx] = method;
       else methods.push(method);
-
       renderMethods(methods);
       saveDashboardState({ methods });
+
+      // Store in phaseData for Phase Inspector Output tab
+      const phase = method.status === 'planned'   ? 'plan'
+                  : method.status === 'analyzed'  ? 'coverage'
+                  : (activePhase || 'implement');
+      const pd = ensurePhaseData(phase);
+      const pidx = pd.methods.findIndex(m => m.method === method.method);
+      if (pidx >= 0) pd.methods[pidx] = method;
+      else pd.methods.push(method);
+      if (selectedPhase === phase) renderInspectorTabContent();
     }
 
     function onComplete(ev) {
@@ -697,11 +817,141 @@
     function markPhase(p, s) {
       const el = document.querySelector(`.pipeline-phase[data-phase="${p}"]`);
       if (!el) return;
-      el.className = 'pipeline-phase ' + s;
+      const wasSelected = el.classList.contains('selected');
+      el.className = 'pipeline-phase ' + s + (wasSelected ? ' selected' : '');
       const icon = el.querySelector('.phase-icon');
       if (s === 'complete') { icon.textContent = '✓'; completedPhases.add(p); }
       else if (s === 'failed') icon.textContent = '✗';
       else if (s === 'active') icon.textContent = '●';
+      ensurePhaseData(p).status = s;
+      if (selectedPhase === p) renderInspectorHeader();
+    }
+
+    // ─── Phase Inspector ──────────────────────────────────
+
+    function ensurePhaseData(phase) {
+      if (!phaseData[phase]) phaseData[phase] = { status: 'pending', messages: [], summary: '', methods: [] };
+      return phaseData[phase];
+    }
+
+    function selectPhase(phase) {
+      selectedPhase = phase;
+      document.querySelectorAll('.pipeline-phase').forEach(el => {
+        const isSelected = el.dataset.phase === phase;
+        el.classList.toggle('selected', isSelected);
+      });
+      renderInspectorHeader();
+      renderInspectorTabContent();
+    }
+
+    function switchInspectorTab(tab) {
+      activeInspectorTab = tab;
+      document.querySelectorAll('.inspector-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+      });
+      renderInspectorTabContent();
+    }
+
+    function renderInspectorHeader() {
+      const subtitle = $('inspectorSubtitle');
+      if (!selectedPhase) {
+        subtitle.textContent = 'No phase selected';
+        return;
+      }
+      const pd = phaseData[selectedPhase];
+      const status = pd?.status || 'pending';
+      subtitle.textContent = `Phase: ${selectedPhase} · ${status}`;
+    }
+
+    function renderInspector() {
+      renderInspectorHeader();
+      renderInspectorTabContent();
+    }
+
+    function renderInspectorTabContent() {
+      const content = $('inspectorContent');
+      if (!selectedPhase) {
+        content.innerHTML = '<div class="empty-state">Select a phase from the header pipeline to inspect details.</div>';
+        return;
+      }
+      const pd = phaseData[selectedPhase] || { status: 'pending', messages: [], summary: '' };
+
+      switch (activeInspectorTab) {
+        case 'overview': {
+          const statusColor = pd.status === 'complete' ? 'var(--success)'
+            : pd.status === 'active' ? 'var(--accent)'
+            : pd.status === 'failed' ? 'var(--error)' : 'var(--text-4)';
+          const statusIcon = pd.status === 'complete' ? '✓' : pd.status === 'active' ? '●' : pd.status === 'failed' ? '✗' : '○';
+          content.innerHTML = `
+            <div class="inspector-overview">
+              <div class="inspector-status">
+                <span style="color:${statusColor};font-size:14px">${statusIcon}</span>
+                <span style="color:${statusColor};font-weight:600;text-transform:capitalize">${pd.status}</span>
+              </div>
+              ${pd.summary
+                ? `<div class="inspector-summary">${esc(pd.summary)}</div>`
+                : '<div class="empty-state" style="padding:10px 0">No activity yet</div>'}
+            </div>`;
+          break;
+        }
+        case 'output': {
+          const DETERMINISTIC = ['resolve', 'parse', 'coverage'];
+          if (DETERMINISTIC.includes(selectedPhase)) {
+            // Deterministic phases: show summary text
+            content.innerHTML = pd.summary
+              ? `<div class="inspector-overview"><div class="inspector-summary">${esc(pd.summary)}</div></div>`
+              : '<div class="empty-state">No output for this phase</div>';
+            break;
+          }
+          const outMethods = pd.methods || [];
+          if (!outMethods.length) {
+            content.innerHTML = '<div class="empty-state">No output yet — results appear here as methods are processed</div>';
+            break;
+          }
+          const html = outMethods.map(m => renderOutputMethod(m)).join('');
+          content.innerHTML = `<div class="methods-list">${html}</div>`;
+          break;
+        }
+        case 'messages': {
+          if (!pd.messages?.length) {
+            content.innerHTML = '<div class="empty-state">No messages for this phase</div>';
+            return;
+          }
+          const html = pd.messages.map(m => {
+            if (m.isThinking) {
+              return `<details class="thinking-details">
+                <summary><span class="thinking-badge">🧠 thinking</span><span class="log-phase" data-p="${esc(selectedPhase)}">${esc(selectedPhase)}</span></summary>
+                <pre class="thinking-pre">${esc(m.message)}</pre>
+              </details>`;
+            }
+            return `<div class="log-entry">
+              <span class="log-time">${m.elapsed}s</span>
+              <span class="log-phase" data-p="${esc(selectedPhase)}">${esc(selectedPhase)}</span>
+              <span class="log-msg">${esc(m.message)}</span>
+            </div>`;
+          }).join('');
+          content.innerHTML = `<div class="inspector-messages">${html}</div>`;
+          break;
+        }
+        case 'request': {
+          if (!currentIntent) {
+            content.innerHTML = '<div class="empty-state">No run started yet</div>';
+          } else {
+            const rows = [
+              ['Action', currentIntent.action || '—'],
+              ['Service', currentIntent.service || '—'],
+              ['Methods', currentIntent.methods?.join(', ') || 'all'],
+            ];
+            content.innerHTML = `<div class="inspector-request">${
+              rows.map(([k, v]) => `<div class="inspector-request-row">
+                <span class="inspector-request-key">${k}</span>
+                <span class="inspector-request-val">${esc(String(v))}</span>
+              </div>`).join('')
+            }</div>`;
+          }
+          break;
+        }
+      }
     }
 
     function updatePhaseDetail(p, msg) {
@@ -771,8 +1021,7 @@
         costTotal: $('costTotal').textContent,
         tokenTotal: $('tokenTotal').textContent,
         costBreakdownHtml: $('costBreakdown').innerHTML,
-        methodsHtml: $('methodsList').innerHTML,
-        methodCount: $('methodCount').textContent,
+        phaseDataSnapshot: JSON.parse(JSON.stringify(phaseData)),
         footerLeft: $('footerLeft').textContent,
         footerRight: $('footerRight').textContent,
       };
@@ -795,8 +1044,11 @@
       if (state.costTotal) $('costTotal').textContent = state.costTotal;
       if (state.tokenTotal) $('tokenTotal').textContent = state.tokenTotal;
       if (state.costBreakdownHtml !== undefined) $('costBreakdown').innerHTML = state.costBreakdownHtml;
-      if (state.methodsHtml) $('methodsList').innerHTML = state.methodsHtml;
-      if (state.methodCount) $('methodCount').textContent = state.methodCount;
+      if (state.phaseDataSnapshot) {
+        for (const [phase, data] of Object.entries(state.phaseDataSnapshot)) {
+          phaseData[phase] = data;
+        }
+      }
       if (state.footerLeft) $('footerLeft').textContent = state.footerLeft;
       if (state.footerRight) $('footerRight').textContent = state.footerRight;
       if (state.costByPhase) renderPhaseCosts(state.costByPhase);
@@ -881,40 +1133,54 @@
       });
     }
 
+    function applyInspectorHeight(heightPx) {
+      document.documentElement.style.setProperty('--inspector-height', `${heightPx}px`);
+      saveLayoutState({ inspectorHeight: heightPx });
+    }
+
     function initSectionResizers() {
       const center = document.querySelector('.content-center');
-      const methodsResizer = $('methodsResizer');
       const historyResizer = $('historyResizer');
+      const inspectorResizer = $('inspectorResizer');
       const saved = loadLayoutState();
-      if (saved?.methodsHeight) applyMethodsHeight(saved.methodsHeight);
       if (saved?.historyHeight) applyHistoryHeight(saved.historyHeight);
+      if (saved?.inspectorHeight) applyInspectorHeight(saved.inspectorHeight);
+
+      // Inspector ↕ chat resizer
+      if (inspectorResizer) {
+        let draggingInspector = false;
+        const inspectorPanel = document.getElementById('phaseInspector');
+        inspectorResizer.addEventListener('mousedown', () => {
+          draggingInspector = true;
+          document.body.style.userSelect = 'none';
+        });
+        window.addEventListener('mousemove', (e) => {
+          if (!draggingInspector || !inspectorPanel) return;
+          const rect = inspectorPanel.parentElement.getBoundingClientRect();
+          const nextHeight = Math.max(100, Math.min(rect.height - 200, e.clientY - rect.top));
+          applyInspectorHeight(nextHeight);
+        });
+        window.addEventListener('mouseup', () => {
+          draggingInspector = false;
+          document.body.style.userSelect = '';
+        });
+      }
 
       let dragging = null;
 
       const onMove = (e) => {
         if (!dragging) return;
         const rect = center.getBoundingClientRect();
-        const methodsMin = 140;
         const historyMin = 110;
         const logMin = 120;
-        const methodsHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--methods-height')) || 260;
         const historyHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--history-height')) || 180;
 
-        if (dragging === 'methods') {
-          const maxMethods = rect.height - historyHeight - logMin - 16;
-          const nextHeight = Math.max(methodsMin, Math.min(maxMethods, e.clientY - rect.top));
-          applyMethodsHeight(nextHeight);
-        } else if (dragging === 'history') {
-          const maxHistory = rect.height - methodsHeight - logMin - 16;
+        if (dragging === 'history') {
+          const maxHistory = rect.height - logMin - 16;
           const nextHeight = Math.max(historyMin, Math.min(maxHistory, rect.bottom - e.clientY));
           applyHistoryHeight(nextHeight);
         }
       };
-
-      methodsResizer.addEventListener('mousedown', () => {
-        dragging = 'methods';
-        document.body.style.userSelect = 'none';
-      });
 
       historyResizer.addEventListener('mousedown', () => {
         dragging = 'history';
@@ -1088,8 +1354,8 @@
 
     function renderMethods(methods) {
       const el = $('methodsList');
-      if (!methods?.length) { el.innerHTML = '<div class="empty-state">No methods</div>'; $('methodCount').textContent='0'; return; }
-      $('methodCount').textContent = methods.length;
+      if (!el) return;
+      if (!methods?.length) { el.innerHTML = '<div class="empty-state">No methods</div>'; return; }
       el.innerHTML = methods.map(m => {
         const icon = m.status==='passed'?'✅':m.status==='failed'?'❌':m.status==='planned'?'📋':m.status==='analyzed'?'🔎':m.status==='skipped'?'⏭':'⬜';
         const cls = m.status==='passed'?' passed':m.status==='failed'?' failed':m.status==='analyzed'?' analyzed':'';
@@ -1213,6 +1479,24 @@
         `<div class="plan-case-meta">${esc(type)} · ${esc(testCase.priority || 'P?')}</div>` +
         `<div>${esc(testCase.description || '')}</div>` +
         `</div>`;
+    }
+
+    function renderOutputMethod(m) {
+      const icon = m.status==='passed'?'✅':m.status==='failed'?'❌':m.status==='planned'?'📋':m.status==='analyzed'?'🔎':m.status==='skipped'?'⏭':'⬜';
+      const cls = m.status==='passed'?' passed':m.status==='failed'?' failed':m.status==='analyzed'?' analyzed':'';
+      const cost = m.cost ? '$'+m.cost.toFixed(4) : m.status==='analyzed' ? 'uncovered' : '—';
+      const att = m.attempts > 1 ? ` <span style="color:var(--warning);font-size:10px">(${m.attempts}x)</span>` : '';
+      const plan = m.plan
+        ? `<details class="method-plan"><summary>📋 ${m.plan.totalCases} test case${m.plan.totalCases===1?'':'s'}</summary>`+
+          (m.plan.fileName ? `<div class="plan-file">${esc(m.plan.fileName)}</div>` : '')+
+          renderPlanCase(m.plan.schemaTest, true)+
+          (m.plan.testCases||[]).map(tc=>renderPlanCase(tc,false)).join('')+
+          `</details>`
+        : '';
+      return `<div class="method-card${cls}">`+
+        `<span class="method-status">${icon}</span>`+
+        `<div class="method-body"><div class="method-name">${esc(m.method)}${att}</div>${plan}</div>`+
+        `<span class="method-meta">${cost}</span></div>`;
     }
 
     function renderPhaseCosts(costByPhase) {
