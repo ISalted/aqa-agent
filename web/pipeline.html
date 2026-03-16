@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AQA Agent Pipeline</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0d1117;
+    --bg-1:      #161b22;
+    --bg-2:      #1c2230;
+    --border:    #30363d;
+    --text:      #e6edf3;
+    --muted:     #8b949e;
+    --green:     #3fb950;
+    --orange:    #e3b341;
+    --blue:      #58a6ff;
+    --purple:    #bc8cff;
+    --red:       #f85149;
+    --cyan:      #39d0d8;
+    --accent:    #1f6feb;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    min-height: 100vh;
+    padding: 40px 24px 80px;
+  }
+
+  /* ── Layout ── */
+  .page { max-width: 860px; margin: 0 auto; }
+
+  /* ── Header ── */
+  .header { text-align: center; margin-bottom: 32px; }
+  .header h1 { font-size: 28px; font-weight: 700; color: var(--cyan); letter-spacing: -.5px; }
+  .header .sub { color: var(--muted); font-size: 13px; margin-top: 6px; }
+
+  /* ── Action badges row ── */
+  .actions {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    justify-content: center; margin-bottom: 20px;
+  }
+  .action-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--bg-2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 4px 10px; font-size: 12px;
+  }
+  .action-badge code { color: var(--cyan); font-family: "SFMono-Regular", Consolas, monospace; font-size: 11px; font-weight: 600; }
+  .action-badge span { color: var(--muted); }
+
+  /* ── Legend ── */
+  .legend {
+    display: flex; gap: 20px; justify-content: center;
+    margin-bottom: 32px; font-size: 12px; color: var(--muted);
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* ── Connector ── */
+  .connector {
+    display: flex; justify-content: center; align-items: center;
+    height: 32px; gap: 8px; color: var(--muted); font-size: 12px;
+  }
+  .connector::before {
+    content: ''; display: block; width: 1px; height: 100%;
+    background: var(--border);
+  }
+
+  .connector-label {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 6px; margin: 4px 0 16px; color: var(--muted); font-size: 12px;
+  }
+  .connector-label::before, .connector-label::after {
+    content: ''; display: block; width: 1px; height: 16px;
+    background: var(--border); margin: 0 auto;
+  }
+
+  /* ── Cards ── */
+  .card {
+    border-radius: 10px; border: 1px solid var(--border);
+    background: var(--bg-1); padding: 16px 18px;
+    margin-bottom: 4px; position: relative;
+  }
+  .card.green  { border-color: #2ea043; }
+  .card.blue   { border-color: #1f6feb; }
+  .card.purple { border-color: #7948c9; }
+  .card.red    { border-color: #6e2b2b; background: #160d0d; }
+  .card.orange { border-color: #9e6a03; }
+
+  .card-header {
+    display: flex; align-items: flex-start;
+    justify-content: space-between; gap: 12px; margin-bottom: 6px;
+  }
+  .card-title-row { display: flex; align-items: center; gap: 10px; }
+  .card-icon { font-size: 18px; flex-shrink: 0; }
+  .card-title { font-weight: 700; font-size: 15px; }
+  .card-desc { color: var(--muted); font-size: 12px; margin-top: 3px; }
+
+  /* badge cluster */
+  .badges { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 600;
+    white-space: nowrap;
+  }
+  .badge.green  { background: #0d2e1a; color: #3fb950; border: 1px solid #2ea043; }
+  .badge.blue   { background: #0d1f3c; color: #58a6ff; border: 1px solid #1f6feb; }
+  .badge.purple { background: #1e0f3a; color: #bc8cff; border: 1px solid #7948c9; }
+  .badge.orange { background: #2d1f00; color: #e3b341; border: 1px solid #9e6a03; }
+  .badge.cyan   { background: #072328; color: #39d0d8; border: 1px solid #1a6e75; }
+  .badge.think  { background: #1a1a2e; color: #8b8bff; border: 1px solid #3d3d8f; font-size: 10px; }
+
+  /* tools row */
+  .tools { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+  .tool {
+    background: var(--bg-2); border: 1px solid var(--border);
+    border-radius: 4px; padding: 2px 8px; font-size: 11px;
+    font-family: "SFMono-Regular", Consolas, monospace; color: var(--muted);
+  }
+
+  /* rag / files row */
+  .rag { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .rag-item {
+    display: flex; align-items: center; gap: 4px;
+    background: #0d2a1c; border: 1px solid #1a4d30;
+    border-radius: 4px; padding: 2px 8px; font-size: 11px; color: #5cb87a;
+  }
+  .rag-item.file { background: #1a1a0d; border-color: #3d3d00; color: #ccb843; }
+
+  /* guardrail checks */
+  .checks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .check {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 11px; color: var(--muted);
+  }
+  .check::before { content: '·'; color: var(--border); }
+
+  /* ── Per-method loop wrapper ── */
+  .loop-wrapper {
+    border: 1px dashed #30363d;
+    border-radius: 12px;
+    padding: 20px 16px;
+    margin: 8px 0;
+    position: relative;
+  }
+  .loop-label {
+    position: absolute; top: -11px; left: 50%; transform: translateX(-50%);
+    background: var(--bg); padding: 0 10px;
+    font-size: 10px; font-weight: 700; letter-spacing: 1px;
+    color: var(--muted); text-transform: uppercase; white-space: nowrap;
+  }
+
+  /* ── Pass / Fail fork ── */
+  .fork { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 4px; }
+  .fork-label {
+    font-size: 11px; font-weight: 700; padding: 4px 10px;
+    border-radius: 4px; display: inline-block; margin-bottom: 8px;
+  }
+  .fork-label.pass { background: #0d2e1a; color: #3fb950; }
+  .fork-label.fail { background: #2d0d0d; color: #f85149; }
+
+  /* ── Failure classes ── */
+  .section-title {
+    text-align: center; font-size: 10px; font-weight: 700;
+    letter-spacing: 1.5px; color: var(--muted); text-transform: uppercase;
+    margin: 32px 0 12px;
+  }
+  .failure-classes { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .fc {
+    padding: 4px 12px; border-radius: 4px; font-size: 11px; font-weight: 600;
+    border: 1px solid;
+  }
+  .fc.red    { background: #1a0505; border-color: #6e2b2b; color: #f85149; }
+  .fc.orange { background: #1a0f00; border-color: #7a4f00; color: #e3b341; }
+  .fc.blue   { background: #050d1a; border-color: #1f4070; color: #58a6ff; }
+  .fc.purple { background: #0f0520; border-color: #4a2a8a; color: #bc8cff; }
+  .fc.cyan   { background: #041318; border-color: #0d4a50; color: #39d0d8; }
+  .fc.green  { background: #051a0a; border-color: #1a5c20; color: #3fb950; }
+
+  /* ── Budget ── */
+  .budget-row {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    justify-content: center; margin-top: 10px;
+  }
+  .budget-item {
+    background: var(--bg-1); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 14px; text-align: center;
+    min-width: 90px;
+  }
+  .budget-item .b-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .budget-item .b-val   { font-size: 15px; font-weight: 700; color: var(--cyan); font-family: "SFMono-Regular", monospace; }
+
+  /* ── Retry arrow ── */
+  .retry-label {
+    text-align: right; color: var(--red); font-size: 11px;
+    margin-top: 6px; padding-right: 4px;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <h1>🤖 AQA Agent Pipeline</h1>
+    <div class="sub">skill-trade · cyphertrade · Playwright + TypeScript + gRPC</div>
+  </div>
+
+  <!-- ACTION BADGES -->
+  <div class="actions">
+    <div class="action-badge"><code>cover</code><span>— full cycle</span></div>
+    <div class="action-badge"><code>analyze</code><span>— coverage only</span></div>
+    <div class="action-badge"><code>plan</code><span>— plan only</span></div>
+    <div class="action-badge"><code>implement_only</code><span>— use saved plan</span></div>
+    <div class="action-badge"><code>validate_only</code><span>— run existing tests</span></div>
+    <div class="action-badge"><code>fix</code><span>— debug failing</span></div>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#3fb950"></div> Deterministic (0 LLM tokens)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#e3b341"></div> LLM-driven</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#58a6ff"></div> LLM-hybrid</div>
+  </div>
+
+  <!-- USER REQUEST -->
+  <div class="card blue">
+    <div class="card-header">
+      <div>
+        <div class="card-title-row">
+          <span class="card-icon">👤</span>
+          <span class="card-title">User Request</span>
+        </div>
+        <div class="card-desc">e.g. "cover MissionEngine" · "implement_only InsertOrReplaceRewardPack"</div>
+      </div>
+      <div class="badges">
+        <span class="badge blue">CLI / Web UI</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="connector"></div>
+
+  <!-- RESOLVE -->
+  <div class="card blue">
+    <div class="card-header">
+      <div>
+        <div class="card-title-row">
+          <span class="card-icon">🔍</span>
+          <span class="card-title">Resolve</span>
+        </div>
+        <div class="card-desc">Find service infra · scaffold missing components (proto, wrapper, types, fixture, test dir)</div>
+      </div>
+      <div class="badges">
+        <span class="badge cyan">resolver · Sonnet</span>
+        <span class="badge blue">LLM-hybrid</span>
+      </div>
+    </div>
+    <div class="tools">
+      <span class="tool">read_file</span>
+      <span class="tool">write_file</span>
+      <span class="tool">list_files</span>
+      <span class="tool">grep_files</span>
+      <span class="tool">run_command</span>
+    </div>
+  </div>
+
+  <div class="connector"></div>
+
+  <!-- PARSE -->
+  <div class="card green">
+    <div class="card-header">
+      <div>
+        <div class="card-title-row">
+          <span class="card-icon">📄</span>
+          <span class="card-title">Parse</span>
+        </div>
+        <div class="card-desc">Regex parse .proto → methods, messages, enums, fields</div>
+      </div>
+      <div class="badges">
+        <span class="badge green">Deterministic</span>
+        <span class="badge green" style="font-size:10px">0 LLM tokens</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="connector"></div>
+
+  <!-- COVERAGE -->
+  <div class="card orange">
+    <div class="card-header">
+      <div>
+        <div class="card-title-row">
+          <span class="card-icon">📊</span>
+          <span class="card-title">Coverage</span>
+        </div>
+        <div class="card-desc">Match test files → proto methods · detect gaps · extract existing patterns</div>
+      </div>
+      <div class="badges">
+        <span class="badge green">Deterministic</span>
+        <span class="badge green" style="font-size:10px">0 LLM tokens</span>
+      </div>
+    </div>
+    <div class="rag">
+      <div class="rag-item file">📋 project-index.json</div>
+      <div class="rag-item file">📷 proto-snapshots.json</div>
+    </div>
+  </div>
+
+  <!-- PER-METHOD CONNECTOR -->
+  <div class="connector-label">↓ per uncovered method</div>
+
+  <!-- PER-METHOD LOOP -->
+  <div class="loop-wrapper">
+    <div class="loop-label">✦ Per-Method Loop (for each uncovered method)</div>
+
+    <!-- PLAN -->
+    <div class="card purple">
+      <div class="card-header">
+        <div>
+          <div class="card-title-row">
+            <span class="card-icon">🗒</span>
+            <span class="card-title">Plan</span>
+          </div>
+          <div class="card-desc">Generate test plan: schema test + test cases (IDs: AAA-001)</div>
+        </div>
+        <div class="badges">
+          <span class="badge purple">planner · Haiku</span>
+          <span class="badge think">4096 thinking</span>
+        </div>
+      </div>
+      <div class="rag">
+        <div class="rag-item">🔗 RAG: grpc-patterns, schema-validation, data-generation</div>
+        <div class="rag-item file">📋 failure-patterns.json</div>
+      </div>
+    </div>
+
+    <div class="connector"></div>
+
+    <!-- GUARDRAILS PLAN -->
+    <div class="card green">
+      <div class="card-header">
+        <div>
+          <div class="card-title-row">
+            <span class="card-icon">🛡</span>
+            <span class="card-title">Guardrails — Plan Check</span>
+          </div>
+          <div class="card-desc">service/method set · has schema test · ≥1 positive case · unique IDs · ID format</div>
+        </div>
+        <div class="badges">
+          <span class="badge green">Deterministic</span>
+          <span class="badge green" style="font-size:10px">0 LLM tokens</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector"></div>
+
+    <!-- WRITE TESTS -->
+    <div class="card blue">
+      <div class="card-header">
+        <div>
+          <div class="card-title-row">
+            <span class="card-icon">💻</span>
+            <span class="card-title">Write Tests</span>
+          </div>
+          <div class="card-desc">Generate complete Playwright test file from plan · up to 25 turns</div>
+        </div>
+        <div class="badges">
+          <span class="badge cyan">coder · Sonnet</span>
+          <span class="badge think">10240 thinking</span>
+        </div>
+      </div>
+      <div class="tools">
+        <span class="tool">read_file</span>
+        <span class="tool">write_file</span>
+        <span class="tool">list_files</span>
+        <span class="tool">grep_files</span>
+        <span class="tool">run_command</span>
+      </div>
+      <div class="rag" style="margin-top:8px">
+        <div class="rag-item">🔗 RAG: grpc-patterns, error-assertions, schema-validation</div>
+      </div>
+    </div>
+
+    <div class="connector"></div>
+
+    <!-- GUARDRAILS CODE -->
+    <div class="card green">
+      <div class="card-header">
+        <div>
+          <div class="card-title-row">
+            <span class="card-icon">🛡</span>
+            <span class="card-title">Guardrails — Code Check</span>
+          </div>
+          <div class="card-desc">has imports · has test() · has expect() · no sleep · no .only()/.skip() · no hardcoded emails</div>
+        </div>
+        <div class="badges">
+          <span class="badge green">Deterministic</span>
+          <span class="badge green" style="font-size:10px">0 LLM tokens</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector"></div>
+
+    <!-- RUN TESTS -->
+    <div class="card green">
+      <div class="card-header">
+        <div>
+          <div class="card-title-row">
+            <span class="card-icon">▶️</span>
+            <span class="card-title">Run Tests</span>
+          </div>
+          <div class="card-desc">npx playwright test --reporter=json · collect pass/fail + stack traces</div>
+        </div>
+        <div class="badges">
+          <span class="badge green">Deterministic</span>
+          <span class="badge green" style="font-size:10px">0 LLM tokens</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector"></div>
+
+    <!-- FORK -->
+    <div class="fork">
+      <!-- PASS -->
+      <div>
+        <div class="fork-label pass">✓ PASS</div>
+        <div class="card green">
+          <div class="card-header">
+            <div>
+              <div class="card-title-row">
+                <span class="card-icon">💾</span>
+                <span class="card-title">Save &amp; Report</span>
+              </div>
+              <div class="card-desc">Write ledger · update project-index · run-history.jsonl · emit events</div>
+            </div>
+          </div>
+          <div class="rag" style="margin-top:8px">
+            <div class="rag-item file">📁 run-ledgers/</div>
+            <div class="rag-item file">📋 run-history.jsonl</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FAIL -->
+      <div>
+        <div class="fork-label fail">✕ FAIL</div>
+        <div class="card red">
+          <div class="card-header">
+            <div>
+              <div class="card-title-row">
+                <span class="card-icon">🔧</span>
+                <span class="card-title">Debug</span>
+              </div>
+              <div class="card-desc">Classify failure · infer class · fix code · max 2 retries → re-run</div>
+            </div>
+            <div class="badges">
+              <span class="badge orange">debugger · Sonnet</span>
+              <span class="badge think">10240 thinking</span>
+            </div>
+          </div>
+          <div class="tools">
+            <span class="tool">read_file</span>
+            <span class="tool">write_file</span>
+            <span class="tool">grep_files</span>
+            <span class="tool">run_command</span>
+          </div>
+          <div class="rag" style="margin-top:8px">
+            <div class="rag-item file">📋 failure-patterns.json</div>
+            <div class="rag-item">🔗 RAG: debugging-grpc</div>
+          </div>
+          <div class="retry-label">↺ retry Run (max 2×)</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /loop-wrapper -->
+
+  <!-- FAILURE CLASSES -->
+  <div class="section-title">Debug Failure Classes</div>
+  <div class="failure-classes">
+    <div class="fc red">A · Prompt</div>
+    <div class="fc orange">B · Knowledge</div>
+    <div class="fc cyan">C · Stale proto</div>
+    <div class="fc blue">D · Logic</div>
+    <div class="fc purple">E · Model</div>
+    <div class="fc green">F · Infra → skip</div>
+    <div class="fc orange">G · Spec → escalate</div>
+  </div>
+
+  <!-- BUDGET -->
+  <div class="section-title" style="margin-top:28px">Budget Limits (models.json)</div>
+  <div class="budget-row">
+    <div class="budget-item"><div class="b-label">planner</div><div class="b-val">$0.15</div></div>
+    <div class="budget-item"><div class="b-label">coder</div><div class="b-val">$2.50</div></div>
+    <div class="budget-item"><div class="b-label">debugger</div><div class="b-val">$1.50</div></div>
+    <div class="budget-item"><div class="b-label">resolver</div><div class="b-val">$1.00</div></div>
+    <div class="budget-item"><div class="b-label">per run</div><div class="b-val">$10.00</div></div>
+    <div class="budget-item"><div class="b-label">per day</div><div class="b-val">$50.00</div></div>
+  </div>
+
+</div>
+</body>
+</html>

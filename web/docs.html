@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AQA Agent — System Documentation</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:      #0d1117;
+  --bg-1:    #161b22;
+  --bg-2:    #1c2230;
+  --border:  #30363d;
+  --text:    #e6edf3;
+  --muted:   #8b949e;
+  --green:   #3fb950;
+  --orange:  #e3b341;
+  --blue:    #58a6ff;
+  --purple:  #bc8cff;
+  --red:     #f85149;
+  --cyan:    #39d0d8;
+  --accent:  #1f6feb;
+  --sidebar: 260px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.7;
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ─── Sidebar ─────────────────────────────────────── */
+.sidebar {
+  width: var(--sidebar);
+  min-height: 100vh;
+  background: var(--bg-1);
+  border-right: 1px solid var(--border);
+  padding: 28px 0;
+  position: fixed;
+  top: 0; left: 0;
+  overflow-y: auto;
+  z-index: 100;
+}
+.sidebar-brand {
+  padding: 0 20px 20px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.sidebar-brand .logo { font-size: 20px; font-weight: 800; color: var(--cyan); }
+.sidebar-brand .sub  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.nav-section { padding: 6px 20px 2px; font-size: 10px; font-weight: 700;
+  letter-spacing: 1px; color: var(--muted); text-transform: uppercase; margin-top: 10px; }
+
+.nav-link {
+  display: block; padding: 6px 20px; font-size: 13px;
+  color: var(--muted); text-decoration: none; border-left: 2px solid transparent;
+  transition: all .15s;
+}
+.nav-link:hover { color: var(--text); background: var(--bg-2); }
+.nav-link.active { color: var(--cyan); border-left-color: var(--cyan); background: rgba(57,208,216,.06); }
+
+/* ─── Content ─────────────────────────────────────── */
+.content {
+  margin-left: var(--sidebar);
+  flex: 1;
+  padding: 0 0 80px;
+}
+
+/* ─── Top bar ─────────────────────────────────────── */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(13,17,23,.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 48px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.topbar-title { font-weight: 600; font-size: 14px; color: var(--text); }
+.badge-row { display: flex; gap: 6px; }
+.tag {
+  padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  background: rgba(57,208,216,.1); color: var(--cyan); border: 1px solid rgba(57,208,216,.25);
+}
+
+/* ─── Sections ────────────────────────────────────── */
+.section { padding: 56px 48px 20px; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+
+.section-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 2px;
+  color: var(--cyan); text-transform: uppercase; margin-bottom: 8px;
+}
+h1.section-title {
+  font-size: 32px; font-weight: 800; color: var(--text);
+  letter-spacing: -.5px; margin-bottom: 16px; line-height: 1.2;
+}
+h2.section-title {
+  font-size: 22px; font-weight: 700; color: var(--text);
+  margin: 40px 0 12px;
+}
+h3.section-title {
+  font-size: 16px; font-weight: 600; color: var(--text);
+  margin: 28px 0 10px;
+}
+.lead {
+  font-size: 15px; color: var(--muted); max-width: 720px; line-height: 1.8;
+  margin-bottom: 28px;
+}
+p { color: var(--muted); margin-bottom: 14px; max-width: 760px; }
+
+/* ─── Highlight box ───────────────────────────────── */
+.highlight-box {
+  background: rgba(57,208,216,.06);
+  border: 1px solid rgba(57,208,216,.2);
+  border-left: 3px solid var(--cyan);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin: 20px 0;
+  font-size: 14px; color: var(--text);
+}
+.highlight-box strong { color: var(--cyan); }
+
+/* ─── Cards grid ──────────────────────────────────── */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+  margin: 20px 0;
+}
+.card {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+  transition: border-color .2s;
+}
+.card:hover { border-color: #444d56; }
+.card-icon { font-size: 20px; margin-bottom: 10px; }
+.card-name { font-weight: 700; font-size: 14px; color: var(--text); margin-bottom: 6px; }
+.card-desc { font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+/* ─── Tables ──────────────────────────────────────── */
+.table-wrap { overflow-x: auto; margin: 16px 0 28px; border-radius: 10px; border: 1px solid var(--border); }
+table { width: 100%; border-collapse: collapse; }
+thead tr { background: var(--bg-2); }
+th { padding: 10px 16px; text-align: left; font-size: 11px; font-weight: 700;
+  letter-spacing: .5px; color: var(--muted); text-transform: uppercase;
+  border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 10px 16px; font-size: 13px; color: var(--muted);
+  border-bottom: 1px solid var(--border); vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+tbody tr:nth-child(even) { background: rgba(255,255,255,.02); }
+td:first-child { color: var(--text); font-weight: 500; white-space: nowrap; }
+td code, th code { font-family: "SFMono-Regular", Consolas, monospace; font-size: 12px; color: var(--cyan); }
+
+/* ─── Bullets ─────────────────────────────────────── */
+ul.doc-list { list-style: none; margin: 10px 0 20px; padding: 0; max-width: 760px; }
+ul.doc-list li {
+  padding: 5px 0 5px 20px;
+  position: relative; color: var(--muted); font-size: 13px;
+}
+ul.doc-list li::before {
+  content: '›'; position: absolute; left: 0;
+  color: var(--cyan); font-weight: 700;
+}
+ul.doc-list li strong { color: var(--text); }
+
+/* ─── Steps ───────────────────────────────────────── */
+.steps { margin: 16px 0 28px; max-width: 760px; }
+.step {
+  display: flex; gap: 16px; padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.step:last-child { border-bottom: none; }
+.step-num {
+  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+  background: rgba(57,208,216,.12); border: 1px solid rgba(57,208,216,.3);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: var(--cyan);
+}
+.step-body { flex: 1; }
+.step-title { font-weight: 600; color: var(--text); font-size: 13px; }
+.step-desc  { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+/* ─── Code block ──────────────────────────────────── */
+.code-block {
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 16px 18px; margin: 12px 0 20px;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 12px; line-height: 1.8; color: #a5d6ff;
+  overflow-x: auto; max-width: 760px;
+}
+.code-block .cm { color: var(--muted); }
+.code-block .kw { color: var(--purple); }
+.code-block .st { color: var(--green); }
+
+/* ─── Badge inline ────────────────────────────────── */
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  border-radius: 4px; padding: 1px 8px; font-size: 11px; font-weight: 600;
+}
+.badge.green  { background: #0d2e1a; color: #3fb950; border: 1px solid #2ea043; }
+.badge.blue   { background: #0d1f3c; color: #58a6ff; border: 1px solid #1f6feb; }
+.badge.purple { background: #1e0f3a; color: #bc8cff; border: 1px solid #7948c9; }
+.badge.orange { background: #2d1f00; color: #e3b341; border: 1px solid #9e6a03; }
+.badge.cyan   { background: #072328; color: #39d0d8; border: 1px solid #1a6e75; }
+.badge.red    { background: #2d0505; color: #f85149; border: 1px solid #6e2b2b; }
+
+/* ─── Pipeline diagram ────────────────────────────── */
+.pipeline { max-width: 700px; margin: 24px 0; }
+
+.pipe-card {
+  border-radius: 10px; border: 1px solid var(--border);
+  background: var(--bg-1); padding: 14px 16px; position: relative;
+}
+.pipe-card.p-green  { border-color: #2ea043; }
+.pipe-card.p-blue   { border-color: #1f6feb; }
+.pipe-card.p-purple { border-color: #7948c9; }
+.pipe-card.p-red    { border-color: #6e2b2b; background: #100808; }
+.pipe-card.p-orange { border-color: #9e6a03; }
+
+.pipe-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.pipe-name { font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.pipe-desc { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.pipe-tools { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+.tool-tag {
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: 4px; padding: 2px 8px; font-size: 11px;
+  font-family: "SFMono-Regular", Consolas, monospace; color: var(--muted);
+}
+.pipe-connector {
+  width: 1px; background: var(--border); height: 24px; margin: 0 auto;
+}
+.pipe-label {
+  text-align: center; font-size: 11px; color: var(--muted);
+  padding: 6px 0; display: flex; align-items: center;
+  justify-content: center; gap: 8px;
+}
+.pipe-label::before, .pipe-label::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+.loop-box {
+  border: 1px dashed var(--border); border-radius: 10px;
+  padding: 16px; position: relative; margin: 4px 0;
+}
+.loop-title {
+  position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+  background: var(--bg); padding: 0 10px;
+  font-size: 10px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 1px; white-space: nowrap;
+}
+.fork-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fork-label { font-size: 11px; font-weight: 700; margin-bottom: 6px; }
+.fork-label.pass { color: var(--green); }
+.fork-label.fail { color: var(--red); }
+
+/* ─── Cost grid ───────────────────────────────────── */
+.cost-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px,1fr)); gap: 10px; margin: 16px 0; }
+.cost-card {
+  background: var(--bg-1); border: 1px solid var(--border);
+  border-radius: 8px; padding: 14px 16px; text-align: center;
+}
+.cost-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+.cost-val   { font-size: 22px; font-weight: 800; color: var(--cyan);
+  font-family: "SFMono-Regular", monospace; margin-top: 4px; }
+.cost-note  { font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+/* ─── Failure classes ─────────────────────────────── */
+.fc-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.fc { padding: 4px 14px; border-radius: 4px; font-size: 12px; font-weight: 600; border: 1px solid; }
+
+/* ─── Responsive ──────────────────────────────────── */
+@media (max-width: 768px) {
+  :root { --sidebar: 0px; }
+  .sidebar { display: none; }
+  .section { padding: 40px 24px 16px; }
+  .topbar  { padding: 12px 24px; }
+  .cards-grid { grid-template-columns: 1fr; }
+  .fork-grid  { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════ SIDEBAR ═══════════════════════ -->
+<nav class="sidebar">
+  <div class="sidebar-brand">
+    <div class="logo">🤖 AQA Agent</div>
+    <div class="sub">System Documentation · v1.0</div>
+  </div>
+
+  <div class="nav-section">Overview</div>
+  <a class="nav-link active" href="#what">What Is It?</a>
+  <a class="nav-link" href="#concept">Core Concept</a>
+  <a class="nav-link" href="#scope">Scope &amp; Boundaries</a>
+  <a class="nav-link" href="#components">Key Components</a>
+  <a class="nav-link" href="#features">Features</a>
+  <a class="nav-link" href="#guardrails">Guardrail Architecture</a>
+
+  <div class="nav-section">Context</div>
+  <a class="nav-link" href="#problem">What Problem It Solves</a>
+  <a class="nav-link" href="#decisions">Decisions Taken</a>
+
+  <div class="nav-section">Economics</div>
+  <a class="nav-link" href="#cost">Cost Effectiveness</a>
+
+  <div class="nav-section">Usage</div>
+  <a class="nav-link" href="#workflow">Workflow</a>
+  <a class="nav-link" href="#maintain">Maintain &amp; Update</a>
+</nav>
+
+<!-- ═══════════════════════ CONTENT ═══════════════════════ -->
+<main class="content">
+
+  <div class="topbar">
+    <span class="topbar-title">AQA Agent — System Documentation</span>
+    <div class="badge-row">
+      <span class="tag">TypeScript</span>
+      <span class="tag">Claude API</span>
+      <span class="tag">Playwright</span>
+      <span class="tag">gRPC</span>
+    </div>
+  </div>
+
+  <!-- ─── WHAT IS IT ─── -->
+  <section class="section" id="what">
+    <div class="section-label">01 · System Overview</div>
+    <h1 class="section-title">What Is It?</h1>
+    <p class="lead">AQA Agent is an AI-driven test automation system that automatically generates, runs, debugs, and maintains gRPC integration tests for the CypherTrade platform.</p>
+    <p>Instead of engineers manually writing tests for every new gRPC method, the agent reads the proto contract, reasons about edge cases, writes TypeScript / Playwright test files, runs them, and iterates until they pass — all autonomously.</p>
+
+    <div class="highlight-box">
+      <strong>One-line definition:</strong> AQA Agent turns a service name into a passing test suite — end to end — with no human intervention.
+    </div>
+  </section>
+
+  <!-- ─── CORE CONCEPT ─── -->
+  <section class="section" id="concept">
+    <div class="section-label">02 · Architecture</div>
+    <h1 class="section-title">Core Concept</h1>
+    <p class="lead">The agent is built on a deterministic state machine that orchestrates a pipeline of phases. Some phases are pure code (no LLM); others spawn an LLM agent with a specific role, tools, and budget.</p>
+
+    <div class="highlight-box">
+      <strong>Pattern:</strong> Deterministic setup → LLM planning → Deterministic guardrails → LLM coding → Deterministic validation → LLM debugging (if needed)
+    </div>
+
+    <p>Every phase transition is validated against an explicit <code>PHASE_TRANSITIONS</code> table. Invalid transitions throw immediately — no silent state corruption. Every transition reason is recorded in <code>state.notes</code> for post-mortem audit.</p>
+
+    <div class="code-block">
+<span class="cm">// PHASE_TRANSITIONS — valid paths through the pipeline</span>
+init      → [resolve, failed]
+resolve   → [parse, failed, stopped]
+parse     → [coverage, failed, stopped]
+coverage  → [plan, done, failed, stopped]
+plan      → [plan, implement, save, done, failed, stopped]
+implement → [implement, validate, plan, save, failed, stopped]
+validate  → [validate, plan, implement, debug, save, done, failed, stopped]
+debug     → [debug, validate, save, failed, stopped]
+save      → [report, failed]
+report    → [done]
+done / failed / stopped → []
+    </div>
+
+    <p>The state machine also tracks agent-to-agent communication. The planner writes schema insights via a <code>save_notes</code> tool call. Those notes travel in <code>state.notes</code> to the coder — explicit, structured, not implicit memory.</p>
+  </section>
+
+  <!-- ─── SCOPE ─── -->
+  <section class="section" id="scope">
+    <div class="section-label">03 · Boundaries</div>
+    <h1 class="section-title">Scope &amp; Boundaries</h1>
+
+    <h2 class="section-title">In Scope</h2>
+    <ul class="doc-list">
+      <li>gRPC integration tests for all services in the <strong>skill-trade</strong> repo</li>
+      <li>Proto contract parsing and schema validation</li>
+      <li>Test coverage analysis and gap detection</li>
+      <li>Test plan generation (structured, prioritised test cases)</li>
+      <li>Test code writing, execution, and auto-debugging</li>
+      <li>Real-time monitoring via web dashboard (localhost:3000)</li>
+      <li>Cost tracking per run, per agent, per phase</li>
+      <li>Proto snapshot tracking — detect contract changes between syncs</li>
+    </ul>
+
+    <h2 class="section-title">Out of Scope</h2>
+    <ul class="doc-list">
+      <li>UI / E2E browser tests</li>
+      <li>Performance or load testing</li>
+      <li>Tests for non-gRPC (REST) endpoints</li>
+      <li>Production deployment of generated tests</li>
+    </ul>
+
+    <h2 class="section-title">Services Covered</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Service</th><th>Wrapper</th><th>Test Dir</th></tr></thead>
+        <tbody>
+          <tr><td>Users</td><td><code>UsersService.ts</code></td><td><code>tests/grpc/users/</code></td></tr>
+          <tr><td>Partners</td><td><code>PartnersService.ts</code></td><td><code>tests/grpc/partners/</code></td></tr>
+          <tr><td>ContestEngine</td><td><code>ContestEngineService.ts</code></td><td><code>tests/grpc/contest-engine/</code></td></tr>
+          <tr><td>XpEngine</td><td><code>XpEngineService.ts</code></td><td><code>tests/grpc/xpengine/</code></td></tr>
+          <tr><td>BrokerIntegration</td><td><code>BrokerIntegrationService.ts</code></td><td><code>tests/grpc/broker-integration/</code></td></tr>
+          <tr><td>BrokerSettings</td><td><code>BrokerSettingsService.ts</code></td><td><code>tests/grpc/broker-settings/</code></td></tr>
+          <tr><td>TraderSettings</td><td><code>TraderSettingsService.ts</code></td><td><code>tests/grpc/trader-settings/</code></td></tr>
+          <tr><td>ClientWallets</td><td><code>ClientWalletsService.ts</code></td><td><code>tests/grpc/client-wallets/</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ─── KEY COMPONENTS ─── -->
+  <section class="section" id="components">
+    <div class="section-label">04 · Architecture</div>
+    <h1 class="section-title">Key Components</h1>
+
+    <div class="cards-grid">
+      <div class="card">
+        <div class="card-icon">⚙️</div>
+        <div class="card-name">Orchestrator</div>
+        <div class="card-desc">Entry point. Initialises RunState, runs setup phases, dispatches per-method actions, saves ledger in finally block.</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔄</div>
+        <div class="card-name">State Machine</div>
+        <div class="card-desc">Validates all phase transitions against PHASE_TRANSITIONS table. Throws on invalid. Records every reason in state.notes.</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔍</div>
+        <div class="card-name">Pipeline Setup</div>
+        <div class="card-desc">Deterministic phases: resolve → parse → coverage. No LLM cost. Pure TypeScript code.</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🎬</div>
+        <div class="card-name">Pipeline Actions</div>
+        <div class="card-desc">Per-action handlers: cover, plan, fix, validate_only, implement_only. Each dispatched from orchestrator switch.</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🤖</div>
+        <div class="card-name">Agentic Loop</div>
+        <div class="card-desc">LLM loop per agent call. Extended thinking, tool calls (save_notes, complete_phase), history compression.</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">📚</div>
+        <div class="card-name">Context Builder (RAG)</div>
+        <div class="card-desc">Assembles system prompts per role: planner vs coder vs debugger. Injects proto, example tests, wrapper, failure patterns.</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">💰</div>
+        <div class="card-name">Cost Tracker</div>
+        <div class="card-desc">Tracks input / output / cache tokens and USD cost per step, per agent, per phase. Budget limits enforced.</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🖥️</div>
+        <div class="card-name">Web Dashboard</div>
+        <div class="card-desc">Single-page app (SSE + localStorage). Pipeline phases, phase inspector, live log, run history, cost, chat.</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">💾</div>
+        <div class="card-name">Memory / Persistence</div>
+        <div class="card-desc">Project index (coverage %), run history, plan artifacts (resumable runs), run ledger (decisions + facts per run).</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── FEATURES ─── -->
+  <section class="section" id="features">
+    <div class="section-label">05 · Capabilities</div>
+    <h1 class="section-title">Features</h1>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Feature</th><th>Detail</th></tr></thead>
+        <tbody>
+          <tr><td>Full pipeline automation</td><td>resolve → parse → coverage → plan → implement → validate → debug → done</td></tr>
+          <tr><td>Six run actions</td><td><code>cover</code>, <code>plan</code>, <code>fix</code>, <code>analyze</code>, <code>validate_only</code>, <code>implement_only</code></td></tr>
+          <tr><td>Resumable runs</td><td>Save plan artifacts as JSON, resume <code>implement_only</code> without re-planning</td></tr>
+          <tr><td>Extended thinking</td><td>Claude adaptive thinking (4096–10240 tokens) for complex proto schemas</td></tr>
+          <tr><td>History compression</td><td>Last 2 turns full, older tool results compressed — saves 40–60% tokens on long runs</td></tr>
+          <tr><td>Agent notes (save_notes)</td><td>Planner writes schema insights → travels in state.notes to coder. Explicit inter-agent communication.</td></tr>
+          <tr><td>Proto snapshot tracking</td><td>Hash-based detection of contract changes between syncs</td></tr>
+          <tr><td>Run ledger</td><td>Full audit trail of facts, decisions, and attempts per run saved as JSON</td></tr>
+          <tr><td>Failure classification</td><td>7 failure classes (A_PROMPT → G_SPEC) with auto-fix or escalate strategies</td></tr>
+          <tr><td>Real-time SSE events</td><td>Every phase transition and log line streamed to dashboard. Auto-reconnect.</td></tr>
+          <tr><td>Cost visibility</td><td>USD cost per run, per agent, per phase. Budget limits per agent and per run.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ─── GUARDRAILS ─── -->
+  <section class="section" id="guardrails">
+    <div class="section-label">06 · Safety</div>
+    <h1 class="section-title">Guardrail Architecture</h1>
+    <p class="lead">Multiple layers prevent silent failures, invalid code, and cost overruns.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Layer</th><th>Guardrail</th><th>Mechanism</th></tr></thead>
+        <tbody>
+          <tr><td>State</td><td>Invalid phase transition</td><td>State machine throws immediately with full context. No silent corruption.</td></tr>
+          <tr><td>Cost</td><td>Budget limit per agent</td><td><code>AgentConfig.budgetLimit</code> checked before each LLM call. Run stops cleanly.</td></tr>
+          <tr><td>Retries</td><td>Max implement attempts</td><td><code>state.maxRetries = 2</code>. Each failed attempt increments counter. Stops, reports partial.</td></tr>
+          <tr><td>Abort</td><td>User cancel</td><td><code>AbortSignal</code> passed through entire pipeline. Checked before each method iteration.</td></tr>
+          <tr><td>Code quality</td><td>Guardrails — Code Check</td><td>Deterministic static checks: has imports, has test(), no sleep(), no .only()/.skip(), no hardcoded emails.</td></tr>
+          <tr><td>Plan quality</td><td>Guardrails — Plan Check</td><td>Checks: service/method set, has schema test, ≥1 positive case, unique IDs, correct ID format.</td></tr>
+          <tr><td>Contract</td><td>Proto source of truth</td><td>NEVER edit generated/ code. Proto files are canonical. Tests import only from wrappers.</td></tr>
+          <tr><td>Data</td><td>No hardcoded values</td><td>No IDs, no timestamps, no production PII in tests. Each test self-contained.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ─── PROBLEM ─── -->
+  <section class="section" id="problem">
+    <div class="section-label">07 · Motivation</div>
+    <h1 class="section-title">What Problem Does It Solve?</h1>
+    <p class="lead">The skill-trade platform has 8 gRPC services with dozens of methods. Manually writing, maintaining, and running integration tests for all of them is slow, expensive, and error-prone.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Problem</th><th>Impact</th><th>Before</th><th>After AQA Agent</th></tr></thead>
+        <tbody>
+          <tr><td>Manual test authoring</td><td>High engineer time cost</td><td>Hours per method</td><td>Automated</td></tr>
+          <tr><td>Coverage gaps</td><td>Untested methods ship to prod</td><td>Unknown coverage</td><td>Real-time % per service</td></tr>
+          <tr><td>Contract drift</td><td>Proto changes break tests silently</td><td>Discovered in CI failures</td><td>Proto snapshot diff on every sync</td></tr>
+          <tr><td>Debugging loops</td><td>Engineers debug flaky tests manually</td><td>Slow, expensive</td><td>Auto-debug with classified failure strategies</td></tr>
+          <tr><td>Context switching</td><td>QA blocks dev velocity</td><td>QA team bottleneck</td><td>Agent runs async, unblocks team</td></tr>
+          <tr><td>Cost visibility</td><td>LLM usage untracked</td><td>Black box</td><td>USD cost per run, per agent, per phase</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="highlight-box">
+      The agent does not replace QA engineers — it eliminates the <strong>repetitive, mechanical part</strong> of test writing so engineers can focus on complex scenarios, business logic validation, and architecture decisions.
+    </div>
+  </section>
+
+  <!-- ─── DECISIONS ─── -->
+  <section class="section" id="decisions">
+    <div class="section-label">08 · Design</div>
+    <h1 class="section-title">Decisions Taken</h1>
+
+    <h2 class="section-title">Architecture Decisions</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Decision</th><th>Rationale</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>State machine with explicit transition table</td>
+            <td>Prevents silent phase corruption. Every invalid transition throws with full context. Every reason recorded in state.notes for audit.</td>
+          </tr>
+          <tr>
+            <td>Artifact-first types</td>
+            <td>Each phase produces a strongly-typed artifact (NormalizedContract, CoverageReport, TestPlan). Downstream phases receive clean validated data — not raw strings.</td>
+          </tr>
+          <tr>
+            <td>History compression</td>
+            <td>LLM context grows linearly with tool calls. Last 2 turns full, older compressed to [compressed: N chars]. Reduces token cost 40–60% on long implement runs.</td>
+          </tr>
+          <tr>
+            <td>save_notes as agent-to-agent communication</td>
+            <td>Agents don't share memory implicitly. Planner writes insights explicitly via tool call → travels to coder via state.notes. Structured, auditable, not magic.</td>
+          </tr>
+          <tr>
+            <td>Resumable plan / implement split</td>
+            <td>Plan artifacts saved as JSON. implement_only loads them without re-running planner. Allows re-implementing after prompt changes without paying for re-planning.</td>
+          </tr>
+          <tr>
+            <td>RAG context builder per agent role</td>
+            <td>Planner prompt ≠ coder prompt ≠ debugger prompt. Each gets only the context it needs. Reduces noise and token waste.</td>
+          </tr>
+          <tr>
+            <td>Six run actions</td>
+            <td>Different team needs: analyze-only for reporting, plan-only for review, validate_only for CI, fix for debugging without re-writing.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 class="section-title">Tooling Decisions</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Decision</th><th>Rationale</th></tr></thead>
+        <tbody>
+          <tr><td>Playwright + TypeScript (not Jest/Mocha)</td><td>Existing team expertise. gRPC wrappers already built. Fixtures pattern established. No second test runner needed.</td></tr>
+          <tr><td>Proto files as source of truth</td><td>Generated TypeScript code must never be edited manually. Prevents drift between contract and test assumptions.</td></tr>
+          <tr><td>ts-interface-checker for schema validation</td><td>Runtime schema checks on every gRPC response. First test in every file validates contract shape. Catches breaking API changes early.</td></tr>
+          <tr><td>Claude API with adaptive thinking</td><td>Extended thinking improves reasoning for complex proto schemas. Thinking tokens not charged at full rate.</td></tr>
+          <tr><td>SSE for dashboard</td><td>No WebSocket server needed. Built into Node.js HTTP. Auto-reconnect on disconnect. Simple and reliable.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ─── COST ─── -->
+  <section class="section" id="cost">
+    <div class="section-label">09 · Economics</div>
+    <h1 class="section-title">Cost Effectiveness</h1>
+
+    <h2 class="section-title">Model Tier Strategy</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Tier</th><th>Used For</th><th>Profile</th></tr></thead>
+        <tbody>
+          <tr><td><span class="badge green">haiku</span></td><td>Researcher, simple queries, context retrieval</td><td>Cheapest — ~$0.0008 / 1K tokens</td></tr>
+          <tr><td><span class="badge blue">sonnet</span></td><td>Planner, reviewer, structured reasoning</td><td>Mid — ~$0.003 / 1K tokens</td></tr>
+          <tr><td><span class="badge purple">opus</span></td><td>Coder (implement), debugger (complex fixes)</td><td>Most capable — higher cost, best output quality</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 class="section-title">Cost Reduction Techniques</h2>
+    <ul class="doc-list">
+      <li><strong>History compression</strong> — compresses tool results older than last 2 turns. Reduces context 40–60% on long runs.</li>
+      <li><strong>Prompt caching</strong> — system prompts marked for cache. Cache read tokens cost 90% less than input tokens.</li>
+      <li><strong>Budget limits per agent</strong> — each AgentConfig has budgetLimit. Agent stops before exceeding it.</li>
+      <li><strong>Per-run budget cap</strong> — prevents runaway loops. Default: $10 per run.</li>
+      <li><strong>implement_only action</strong> — skips re-planning. Pay for implementation only.</li>
+      <li><strong>analyze action</strong> — coverage report only, zero LLM cost.</li>
+    </ul>
+
+    <h2 class="section-title">Observed Cost Range</h2>
+    <div class="cost-grid">
+      <div class="cost-card">
+        <div class="cost-label">analyze</div>
+        <div class="cost-val">$0.00</div>
+        <div class="cost-note">no LLM, deterministic</div>
+      </div>
+      <div class="cost-card">
+        <div class="cost-label">plan · 1 method</div>
+        <div class="cost-val">~$0.03</div>
+        <div class="cost-note">planner only</div>
+      </div>
+      <div class="cost-card">
+        <div class="cost-label">cover · 1 method</div>
+        <div class="cost-val">~$0.20</div>
+        <div class="cost-note">plan + implement + validate</div>
+      </div>
+      <div class="cost-card">
+        <div class="cost-label">fix · 1 method</div>
+        <div class="cost-val">~$0.15</div>
+        <div class="cost-note">debug + re-run</div>
+      </div>
+      <div class="cost-card">
+        <div class="cost-label">full service</div>
+        <div class="cost-val">~$1.00</div>
+        <div class="cost-note">all methods, all phases</div>
+      </div>
+    </div>
+
+    <div class="highlight-box" style="margin-top:20px">
+      Compare: a QA engineer spending <strong>4–8 hours</strong> writing tests for one service at market rate vastly exceeds the agent cost per service.
+    </div>
+
+    <h2 class="section-title">Budget Limits (models.json)</h2>
+    <div class="cost-grid">
+      <div class="cost-card"><div class="cost-label">planner</div><div class="cost-val">$0.15</div></div>
+      <div class="cost-card"><div class="cost-label">coder</div><div class="cost-val">$2.50</div></div>
+      <div class="cost-card"><div class="cost-label">debugger</div><div class="cost-val">$1.50</div></div>
+      <div class="cost-card"><div class="cost-label">resolver</div><div class="cost-val">$1.00</div></div>
+      <div class="cost-card"><div class="cost-label">per run</div><div class="cost-val">$10.00</div></div>
+      <div class="cost-card"><div class="cost-label">per day</div><div class="cost-val">$50.00</div></div>
+    </div>
+  </section>
+
+  <!-- ─── WORKFLOW ─── -->
+  <section class="section" id="workflow">
+    <div class="section-label">10 · Process</div>
+    <h1 class="section-title">Workflow</h1>
+
+    <h2 class="section-title">Pipeline Phases</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Phase</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td>init</td><td><span class="badge cyan">setup</span></td><td>RunState created. runId assigned. Cost accumulator initialised.</td></tr>
+          <tr><td>resolve</td><td><span class="badge blue">LLM-hybrid</span></td><td>Finds proto file, service wrapper, types, test directory. Scaffolds missing components.</td></tr>
+          <tr><td>parse</td><td><span class="badge green">deterministic</span></td><td>Regex parses proto → NormalizedContract: methods, messages, enums, field types.</td></tr>
+          <tr><td>coverage</td><td><span class="badge green">deterministic</span></td><td>Scans test files. Builds CoverageReport: covered %, uncovered methods list.</td></tr>
+          <tr><td>plan</td><td><span class="badge purple">LLM · Haiku</span></td><td>Per method: generates TestPlan with schema test + typed test cases. Writes notes via save_notes.</td></tr>
+          <tr><td>implement</td><td><span class="badge purple">LLM · Opus</span></td><td>Per method: reads proto, wrapper, example tests. Writes TypeScript Playwright test file.</td></tr>
+          <tr><td>validate</td><td><span class="badge green">deterministic</span></td><td>Runs Playwright. Returns TestResult: passed, failed, skipped, errors.</td></tr>
+          <tr><td>debug</td><td><span class="badge orange">LLM · Sonnet</span></td><td>Classifies failure (A–G). Applies auto-fix or LLM-debug. Re-runs validate.</td></tr>
+          <tr><td>save</td><td><span class="badge green">deterministic</span></td><td>Saves plan artifacts or last implement run. Updates service index and run history.</td></tr>
+          <tr><td>report</td><td><span class="badge green">deterministic</span></td><td>Prints per-method result table. Emits complete SSE event to dashboard.</td></tr>
+          <tr><td>done / failed / stopped</td><td><span class="badge cyan">terminal</span></td><td>Pipeline ends. Ledger saved regardless (finally block).</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 class="section-title">Pipeline Diagram</h2>
+    <div class="pipeline">
+
+      <div class="pipe-card p-blue">
+        <div class="pipe-header">
+          <div><div class="pipe-name">👤 User Request</div><div class="pipe-desc">e.g. "cover MissionEngine" · "plan InsertOrReplaceRewardPack"</div></div>
+          <span class="badge blue">CLI / Web UI</span>
+        </div>
+      </div>
+
+      <div class="pipe-connector"></div>
+
+      <div class="pipe-card p-blue">
+        <div class="pipe-header">
+          <div><div class="pipe-name">🔍 Resolve</div><div class="pipe-desc">Find service infra · scaffold missing components</div></div>
+          <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+            <span class="badge cyan">resolver · Sonnet</span>
+            <span class="badge blue">LLM-hybrid</span>
+          </div>
+        </div>
+        <div class="pipe-tools">
+          <span class="tool-tag">read_file</span><span class="tool-tag">write_file</span>
+          <span class="tool-tag">list_files</span><span class="tool-tag">grep_files</span>
+          <span class="tool-tag">run_command</span>
+        </div>
+      </div>
+
+      <div class="pipe-connector"></div>
+
+      <div class="pipe-card p-green">
+        <div class="pipe-header">
+          <div><div class="pipe-name">📄 Parse</div><div class="pipe-desc">Regex parse .proto → methods, messages, enums, fields</div></div>
+          <span class="badge green">Deterministic · 0 LLM tokens</span>
+        </div>
+      </div>
+
+      <div class="pipe-connector"></div>
+
+      <div class="pipe-card p-orange">
+        <div class="pipe-header">
+          <div><div class="pipe-name">📊 Coverage</div><div class="pipe-desc">Match test files → proto methods · detect gaps · extract patterns</div></div>
+          <span class="badge green">Deterministic · 0 LLM tokens</span>
+        </div>
+      </div>
+
+      <div class="pipe-label">↓ per uncovered method</div>
+
+      <div class="loop-box">
+        <div class="loop-title">✦ Per-Method Loop</div>
+
+        <div class="pipe-card p-purple">
+          <div class="pipe-header">
+            <div><div class="pipe-name">🗒 Plan</div><div class="pipe-desc">Generate test plan: schema test + typed test cases (IDs: AAA-001)</div></div>
+            <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+              <span class="badge purple">planner · Haiku</span>
+              <span style="font-size:10px;color:#8b8bff">4096 thinking</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pipe-connector"></div>
+
+        <div class="pipe-card p-green">
+          <div class="pipe-header">
+            <div><div class="pipe-name">🛡 Guardrails — Plan Check</div><div class="pipe-desc">service/method set · schema test · ≥1 positive case · unique IDs · format</div></div>
+            <span class="badge green">Deterministic</span>
+          </div>
+        </div>
+
+        <div class="pipe-connector"></div>
+
+        <div class="pipe-card p-blue">
+          <div class="pipe-header">
+            <div><div class="pipe-name">💻 Write Tests</div><div class="pipe-desc">Generate complete Playwright test file from plan · up to 25 turns</div></div>
+            <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+              <span class="badge cyan">coder · Sonnet</span>
+              <span style="font-size:10px;color:#8b8bff">10240 thinking</span>
+            </div>
+          </div>
+          <div class="pipe-tools">
+            <span class="tool-tag">read_file</span><span class="tool-tag">write_file</span>
+            <span class="tool-tag">list_files</span><span class="tool-tag">grep_files</span>
+            <span class="tool-tag">run_command</span>
+          </div>
+        </div>
+
+        <div class="pipe-connector"></div>
+
+        <div class="pipe-card p-green">
+          <div class="pipe-header">
+            <div><div class="pipe-name">🛡 Guardrails — Code Check</div><div class="pipe-desc">imports · test() · expect() · no sleep · no .only()/.skip() · no hardcoded emails</div></div>
+            <span class="badge green">Deterministic</span>
+          </div>
+        </div>
+
+        <div class="pipe-connector"></div>
+
+        <div class="pipe-card p-green">
+          <div class="pipe-header">
+            <div><div class="pipe-name">▶️ Run Tests</div><div class="pipe-desc">npx playwright test --reporter=json · collect pass/fail + stack traces</div></div>
+            <span class="badge green">Deterministic</span>
+          </div>
+        </div>
+
+        <div class="pipe-connector"></div>
+
+        <div class="fork-grid">
+          <div>
+            <div class="fork-label pass">✓ PASS</div>
+            <div class="pipe-card p-green">
+              <div class="pipe-name" style="font-size:13px">💾 Save &amp; Report</div>
+              <div class="pipe-desc" style="margin-top:4px">Write ledger · update project-index · run-history.jsonl · emit SSE events</div>
+            </div>
+          </div>
+          <div>
+            <div class="fork-label fail">✕ FAIL</div>
+            <div class="pipe-card p-red">
+              <div class="pipe-header">
+                <div><div class="pipe-name" style="font-size:13px">🔧 Debug</div><div class="pipe-desc" style="margin-top:4px">Classify failure · fix code · max 2 retries → re-run</div></div>
+                <span class="badge orange">debugger · Sonnet</span>
+              </div>
+              <div style="font-size:11px;color:var(--red);text-align:right;margin-top:8px">↺ retry Run (max 2×)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h2 class="section-title">Debug Failure Classes</h2>
+    <div class="fc-row">
+      <div class="fc" style="background:#1a0505;border-color:#6e2b2b;color:#f85149">A · Prompt</div>
+      <div class="fc" style="background:#1a0f00;border-color:#7a4f00;color:#e3b341">B · Knowledge</div>
+      <div class="fc" style="background:#041318;border-color:#0d4a50;color:#39d0d8">C · Stale proto</div>
+      <div class="fc" style="background:#050d1a;border-color:#1f4070;color:#58a6ff">D · Logic</div>
+      <div class="fc" style="background:#0f0520;border-color:#4a2a8a;color:#bc8cff">E · Model</div>
+      <div class="fc" style="background:#051a0a;border-color:#1a5c20;color:#3fb950">F · Infra → skip</div>
+      <div class="fc" style="background:#1a0f00;border-color:#7a4f00;color:#e3b341">G · Spec → escalate</div>
+    </div>
+
+    <h2 class="section-title">Run Actions</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Action</th><th>What It Does</th></tr></thead>
+        <tbody>
+          <tr><td><code>cover</code></td><td>Full pipeline: plan → implement → validate → debug. Targets uncovered methods only.</td></tr>
+          <tr><td><code>plan</code></td><td>Plan only. Saves plan artifacts as JSON. No test files written.</td></tr>
+          <tr><td><code>implement_only</code></td><td>Loads saved plans. Implements without re-planning.</td></tr>
+          <tr><td><code>fix</code></td><td>Re-runs implement → validate → debug on already-covered methods (existing tests failing).</td></tr>
+          <tr><td><code>validate_only</code></td><td>Run tests only. No write, no debug. Used in CI.</td></tr>
+          <tr><td><code>analyze</code></td><td>Coverage report only. No LLM. Cost: $0.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 class="section-title">How to Run</h2>
+    <div class="code-block">
+<span class="cm"># Start the dashboard server</span>
+cd /Users/brudni/aqa-agent && npm run dev
+
+<span class="cm"># Open dashboard</span>
+http://localhost:3000
+
+<span class="cm"># Or use CLI directly</span>
+cd /Users/brudni/skill-trade
+claude --agent main-agent
+
+<span class="cm"># Example prompts</span>
+plan tests for MissionEngine
+cover InsertOrReplaceMissionsGroup in MissionEngine
+analyze MissionEngine
+fix tests for MissionEngine
+    </div>
+  </section>
+
+  <!-- ─── MAINTAIN ─── -->
+  <section class="section" id="maintain">
+    <div class="section-label">11 · Operations</div>
+    <h1 class="section-title">How to Maintain &amp; Update</h1>
+
+    <h2 class="section-title">Adding a New gRPC Service</h2>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Add proto file</div><div class="step-desc">Copy to <code>skill-trade/lib/clients/gRPC/proto/</code></div></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">Regenerate code</div><div class="step-desc">Run <code>npm run proto</code> inside skill-trade — regenerates <code>generated/</code> code</div></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">Create service wrapper</div><div class="step-desc"><code>lib/clients/gRPC/services/{ServiceName}.ts</code></div></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-body"><div class="step-title">Add type definitions</div><div class="step-desc"><code>lib/clients/gRPC/types/{service}/</code></div></div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-body"><div class="step-title">Register fixture</div><div class="step-desc">Add client to <code>lib/fixtures.ts</code> under <code>gRPC</code></div></div></div>
+      <div class="step"><div class="step-num">6</div><div class="step-body"><div class="step-title">Run the agent</div><div class="step-desc"><code>cover {ServiceName}</code> — agent handles everything else</div></div></div>
+    </div>
+
+    <h2 class="section-title">Updating Agent Prompts</h2>
+    <ul class="doc-list">
+      <li><strong>System prompts location:</strong> <code>src/rag/context-builder.ts</code></li>
+      <li><strong>Planner prompt</strong> — modify when test plan quality degrades or new test case types needed</li>
+      <li><strong>Coder prompt</strong> — modify when generated code style drifts from team conventions</li>
+      <li><strong>Debugger prompt</strong> — modify when new failure patterns emerge</li>
+      <li>After prompt change: run <code>implement_only</code> — skips re-planning, applies new coder prompt only</li>
+    </ul>
+
+    <h2 class="section-title">Monitoring &amp; Debugging</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>What to Check</th><th>Where</th></tr></thead>
+        <tbody>
+          <tr><td>Live run status</td><td>Dashboard → Live Log (left column)</td></tr>
+          <tr><td>Phase-by-phase output</td><td>Dashboard → Phase Inspector (center column)</td></tr>
+          <tr><td>Run history with costs</td><td>Dashboard → Run History + Cost panel</td></tr>
+          <tr><td>Full ledger per run</td><td><code>aqa-agent/memory/ledger/{runId}.json</code></td></tr>
+          <tr><td>Service coverage index</td><td><code>aqa-agent/memory/project-index.json</code></td></tr>
+          <tr><td>Proto contract snapshots</td><td><code>aqa-agent/memory/proto-snapshots.json</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 class="section-title">Coverage Targets</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Module</th><th>Target</th><th>Priority</th><th>SLA</th></tr></thead>
+        <tbody>
+          <tr><td>Users (auth, register)</td><td>100%</td><td><span class="badge red">P1</span></td><td>Fix same day if drops</td></tr>
+          <tr><td>ContestEngine</td><td>100%</td><td><span class="badge red">P1</span></td><td>Fix same day if drops</td></tr>
+          <tr><td>XpEngine</td><td>100%</td><td><span class="badge red">P1</span></td><td>Fix same day if drops</td></tr>
+          <tr><td>ClientWallets</td><td>100%</td><td><span class="badge red">P1</span></td><td>Fix same day if drops</td></tr>
+          <tr><td>All other services</td><td>80% minimum</td><td><span class="badge orange">P2</span></td><td>Fix within sprint</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 class="section-title">Adding a New Run Action</h2>
+    <ul class="doc-list">
+      <li>Add to <code>ParsedIntent.action</code> union type in <code>src/types.ts</code></li>
+      <li>Add handler in <code>src/engine/pipeline-actions.ts</code></li>
+      <li>Add case to switch in <code>src/engine/orchestrator.ts</code></li>
+      <li>Update <code>selectMethods()</code> logic if needed</li>
+      <li>Update <code>PHASE_TRANSITIONS</code> if new phases are introduced</li>
+    </ul>
+
+  </section>
+
+</main>
+
+<script>
+// Active nav link on scroll
+const sections = document.querySelectorAll('.section[id]');
+const links = document.querySelectorAll('.nav-link');
+
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      links.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + e.target.id));
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' });
+
+sections.forEach(s => obs.observe(s));
+</script>
+</body>
+</html>
