@@ -134,8 +134,7 @@ export async function runPipeline(
         case "implement_only":
           methodResult = await processCover(state, method, ctx, savedPlansForResume![method]);
           break;
-        case "cover":
-        default:
+        default: // "run" — full pipeline: plan → implement → validate → debug
           methodResult = await processCover(state, method, ctx);
           break;
       }
@@ -150,7 +149,7 @@ export async function runPipeline(
       savePlanArtifacts(state.service, state.runId, state.methodResults,
         state.infrastructure ? { protoPath: state.infrastructure.protoPath, testDir: state.infrastructure.testDir } : undefined);
     }
-    if (intent.action === "cover" || intent.action === "implement_only") {
+    if (intent.action === null || intent.action === "implement_only") {
       saveLastImplementRun(state.service, state.runId, state.methodResults);
     }
     updateMemory(state);
@@ -212,16 +211,16 @@ function selectMethods(
   if (intent.methods && intent.methods.length > 0) return intent.methods;
 
   switch (intent.action) {
-    case "cover": return coverage.uncoveredMethods;
+    case null:   return coverage.uncoveredMethods;
     case "fix":   return coverage.coveredMethods.map((c) => c.method);
     case "plan":  return coverage.uncoveredMethods;
     default:      return coverage.uncoveredMethods;
   }
 }
 
-function decideWhy(action: string): string {
+function decideWhy(action: string | null): string {
   switch (action) {
-    case "cover":          return "Uncovered methods found";
+    case null:            return "Running full pipeline";
     case "implement_only": return "Using saved plans from previous plan run";
     case "validate_only":  return "Running tests only (no write, no debug)";
     case "fix":            return "User requested fix of failing tests";

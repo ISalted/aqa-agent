@@ -4,13 +4,12 @@ import { globSync } from "glob";
 import Anthropic from "@anthropic-ai/sdk";
 import type { ParsedIntent } from "./types.js";
 
-const ACTION_KEYWORDS: Record<ParsedIntent["action"], RegExp> = {
-  analyze: /аналіз|проаналізу|analyze|coverage|покрит[тя]/i,
-  plan: /план|plan|запланій/i,
-  fix: /полагод|fix|виправ|repair|почин|лагод/i,
-  implement_only: /реалізуй тести|тепер реалізуй|тепер імплементуй|імплементуй тести|implement_only|implement only|збережених планів/i,
-  validate_only: /запусти тести|завалідуй|run tests|validate|заранити тести/i,
-  cover: /покри[йтв]|cover|напиши|write|тестам|тести|test/i,
+const ACTION_KEYWORDS: Partial<Record<NonNullable<ParsedIntent["action"]>, RegExp>> = {
+  analyze:       /аналіз|проаналізу|analyze|coverage|покрит[тя]/i,
+  plan:          /^план|^plan|тільки план|plan only|запланій/i,
+  fix:           /полагод|fix|виправ|repair|почин|лагод/i,
+  implement_only:/реалізуй тести по плану|тепер реалізуй|тепер імплементуй|імплементуй по плану|implement_only|implement only|збережених планів|use saved plan|from saved plan/i,
+  validate_only: /запусти тести|завалідуй|run tests|validate only|заранити тести/i,
 };
 
 function getAvailableServices(skillTradePath: string): string[] {
@@ -30,10 +29,7 @@ function matchService(prompt: string, services: string[]): string | null {
   return null;
 }
 
-// Priority order: more specific/expensive actions win over simpler ones.
-// This handles compound intents like "analyze AND implement" → cover (full pipeline).
-const ACTION_PRIORITY: ParsedIntent["action"][] = [
-  "cover",
+const ACTION_PRIORITY: NonNullable<ParsedIntent["action"]>[] = [
   "implement_only",
   "fix",
   "validate_only",
@@ -42,14 +38,14 @@ const ACTION_PRIORITY: ParsedIntent["action"][] = [
 ];
 
 function matchAction(prompt: string): ParsedIntent["action"] {
-  const matched = new Set<ParsedIntent["action"]>();
+  const matched = new Set<NonNullable<ParsedIntent["action"]>>();
   for (const [action, regex] of Object.entries(ACTION_KEYWORDS)) {
-    if (regex.test(prompt)) matched.add(action as ParsedIntent["action"]);
+    if ((regex as RegExp).test(prompt)) matched.add(action as NonNullable<ParsedIntent["action"]>);
   }
   for (const action of ACTION_PRIORITY) {
     if (matched.has(action)) return action;
   }
-  return "cover";
+  return null; // default: full pipeline
 }
 
 function matchMethods(
@@ -92,8 +88,8 @@ export async function parsePromptLLM(
     system: [
       "Parse the user's request into a JSON object for a QA test automation agent.",
       `Available services: ${services.join(", ")}`,
-      "Available actions: cover (full pipeline: write tests), analyze (coverage report only), plan (test plans only), fix (repair failures), implement_only (write from saved plans), validate_only (run tests only)",
-      "Action selection rules: if the user wants to write/implement/create tests → use 'cover' (full pipeline). Use 'implement_only' ONLY when user explicitly says 'from saved plan', 'implement only', or similar. Never choose 'implement_only' just because user says 'implement tests'.",
+      "Available actions: null (default, full pipeline: plan+write+validate), analyze (coverage report only), plan (generate test plan only, no implementation), fix (repair failing tests), implement_only (write code from a previously saved plan), validate_only (run existing tests only)",
+      "Action selection rules: return null when user wants to write/create/implement/generate tests — this triggers the full pipeline. Use 'implement_only' ONLY when user explicitly says 'from saved plan', 'use existing plan', or 'implement only'. Use 'plan' ONLY when user says 'only plan' or 'just plan'.",
       'Return ONLY valid JSON: {"action":"...","service":"...","methods":null}',
       'If methods are mentioned, return them as an array: {"methods":["MethodName"]}',
       "If you cannot determine the service, return null.",
@@ -109,7 +105,7 @@ export async function parsePromptLLM(
     if (!parsed.service || !services.includes(parsed.service)) return null;
 
     return {
-      action: parsed.action || "cover",
+      action: parsed.action || null,
       service: parsed.service,
       methods: parsed.methods?.length ? parsed.methods : undefined,
       raw: prompt,

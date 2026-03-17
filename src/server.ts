@@ -113,7 +113,7 @@ function buildProtoUpdateIntents(
     if (!methods.length) continue;
 
     intents.push({
-      action: "cover",
+      action: null,
       service: change.service,
       methods,
       raw: `update tests for proto changes: ${change.service}`,
@@ -364,7 +364,7 @@ app.post("/api/run", async (req, res) => {
     return;
   }
 
-  const { action = "cover", service, methods } = req.body;
+  const { action = null, service, methods } = req.body;
   if (!service) {
     res.status(400).json({ error: "service is required" });
     return;

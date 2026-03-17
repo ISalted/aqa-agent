@@ -257,7 +257,7 @@ export interface MethodResult {
 
 export interface ParsedIntent {
   action:
-    | "cover"
+    | null           // default: full pipeline (understand → plan → implement → validate → debug)
     | "fix"
     | "analyze"
     | "plan"
@@ -360,7 +360,7 @@ export interface RunHistoryEntry {
   runId: string;
   timestamp: string;
   service: string;
-  action: string;
+  action: string | null;
   methodsCovered: number;
   totalMethods: number;
   testsCreated: number;

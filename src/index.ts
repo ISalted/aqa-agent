@@ -6,7 +6,7 @@ const USAGE = `
 AQA Agent — AI-powered test automation for gRPC services
 
 Usage:
-  npm start -- cover <ServiceName>           Full cycle: plan + write tests
+  npm start -- run <ServiceName>           Full cycle: plan + write tests
   npm start -- analyze <ServiceName>         Show coverage report
   npm start -- plan <ServiceName>            Generate test plans only (saves for implement_only)
   npm start -- implement_only <ServiceName>  Write tests from saved plans
@@ -14,7 +14,7 @@ Usage:
   npm start -- fix <ServiceName>             Re-run and fix failing tests
 
 Examples:
-  npm start -- cover ClientWallets
+  npm start -- run ClientWallets
   npm start -- plan MissionEngine
   npm start -- implement_only MissionEngine
   npm start -- validate_only MissionEngine
@@ -51,10 +51,10 @@ function parseIntent(args: string[]): ParsedIntent | null {
 
   if (!service) return null;
 
-  const validActions = ["cover", "fix", "analyze", "plan", "implement_only", "validate_only"];
+  const validActions = ["fix", "analyze", "plan", "implement_only", "validate_only"];
   if (!validActions.includes(action)) {
     return {
-      action: "cover",
+      action: null,
       service: args[0],
       raw: args.join(" "),
     };
