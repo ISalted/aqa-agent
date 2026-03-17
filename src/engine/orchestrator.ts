@@ -43,6 +43,7 @@ export async function runPipeline(
     phase: "init",
     service: intent.service,
     intent,
+    understandContext: null,
     infrastructure: null,
     contract: null,
     coverage: null,

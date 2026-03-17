@@ -181,13 +181,28 @@ export interface GuardrailResult {
   warnings: string[];
 }
 
+// ─── Understand Context ─────────────────────────────────────
+
+export interface UnderstandContext {
+  intent: ParsedIntent;
+  canonicalService: string;
+  protoFile: string;
+  testDir: string;
+  testomatioCoverage: { suiteTitle: string | null; totalTests: number; manualTests: number; automatedTests: number } | null;
+  protoChanges: ProtoChangeServiceReport | null;
+  scope: "changed_only" | "all_methods";
+  localTestFilesCount: number;
+  // Absorbed from resolve/parse/coverage phases
+  infrastructure: ServiceInfrastructure;
+  contract: NormalizedContract;
+  coverage: CoverageReport;
+}
+
 // ─── Run State & Orchestration ──────────────────────────────
 
 export type Phase =
   | "init"
-  | "resolve"
-  | "parse"
-  | "coverage"
+  | "understand"
   | "plan"
   | "implement"
   | "validate"
@@ -209,6 +224,7 @@ export interface RunState {
   phase: Phase;
   service: string;
   intent: ParsedIntent;
+  understandContext: UnderstandContext | null;
   infrastructure: ServiceInfrastructure | null;
   contract: NormalizedContract | null;
   coverage: CoverageReport | null;
@@ -236,6 +252,7 @@ export interface MethodResult {
     | "passed"
     | "failed"
     | "skipped";
+  testCode?: string;
 }
 
 export interface ParsedIntent {

@@ -1,0 +1,62 @@
+{
+  "MissionEngine": {
+    "proto": "MissionEngine.proto",
+    "testDir": "tests/grpc/mission-engine",
+    "testomatio": "mission-engine"
+  },
+  "PartnersGrpcService": {
+    "proto": "PartnersGrpcService.proto",
+    "testDir": "tests/grpc/partners",
+    "testomatio": "partners"
+  },
+  "UsersGrpcService": {
+    "proto": "UsersGrpcService.proto",
+    "testDir": "tests/grpc/users",
+    "testomatio": "users"
+  },
+  "ContestEngine": {
+    "proto": "ContestEngine.proto",
+    "testDir": "tests/grpc/contest-engine",
+    "testomatio": "contest-engine"
+  },
+  "BrokerIntegration": {
+    "proto": "BrokerIntegration.proto",
+    "testDir": "tests/grpc/broker-integration",
+    "testomatio": "broker-integration"
+  },
+  "BrokerSettings": {
+    "proto": "BrokerSettings.proto",
+    "testDir": "tests/grpc/broker-settings",
+    "testomatio": "broker-settings"
+  },
+  "TraderSettings": {
+    "proto": "TraderSettings.proto",
+    "testDir": "tests/grpc/trader-settings",
+    "testomatio": "trader-settings"
+  },
+  "XpEngine": {
+    "proto": "XpEngine.proto",
+    "testDir": "tests/grpc/xpengine",
+    "testomatio": "xpengine"
+  },
+  "ContestCandlesGrpcService": {
+    "proto": "ContestCandlesGrpcService.proto",
+    "testDir": "tests/grpc/contest-candles",
+    "testomatio": null
+  },
+  "StaticFilesGrpc": {
+    "proto": "StaticFilesGrpc.proto",
+    "testDir": "tests/grpc/static-files",
+    "testomatio": null
+  },
+  "ClientWallets": {
+    "proto": "ClientWallets.proto",
+    "testDir": "tests/grpc/client-wallets",
+    "testomatio": null
+  },
+  "BrokerAffiliateIntegration": {
+    "proto": "BrokerAffiliateIntegration.proto",
+    "testDir": "tests/grpc/broker-affiliate-integration",
+    "testomatio": null
+  }
+}

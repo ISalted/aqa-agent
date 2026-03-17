@@ -1,14 +1,14 @@
-import { resolveService } from "../steps/resolve-service.js";
+import { loadPlanContext, type PlanContext } from "../memory/resumable-context.js";
+import { emitPipelineEvent, serializeStateSnapshot } from "../events.js";
+import { transition } from "./state-machine.js";
+import { understand } from "../understand/index.js";
 import { parseContract } from "../steps/parse-contract.js";
 import { analyzeCoverage } from "../steps/analyze-coverage.js";
-import { loadPlanContext, type PlanContext } from "../memory/resumable-context.js";
-import { emitPipelineEvent } from "../events.js";
-import { transition } from "./state-machine.js";
 import type { RunState, LedgerFact } from "../types.js";
 
 /**
- * Runs the setup phases: resolve → parse → coverage.
- * Handles the implement_only fast path (skip resolve if saved plan context exists).
+ * Runs the Understand phase (absorbs resolve → parse → coverage).
+ * Handles the implement_only fast path (skip understand if saved plan context exists).
  * Mutates state in place and returns it.
  */
 export async function runSetupPhases(
@@ -19,19 +19,24 @@ export async function runSetupPhases(
 ): Promise<RunState> {
   const { intent } = state;
 
+  // ─── Phase: Understand ───────────────────────────────────
+  checkAbort(signal);
+  transition(state, "understand", "gathering service context");
+  log(state, "Resolving service context...");
+
   // ─── implement_only fast path ────────────────────────────
   let savedPlanContext: PlanContext | null = null;
   if (intent.action === "implement_only") {
     savedPlanContext = loadPlanContext(intent.service);
   }
 
-  const skipResolve =
+  const skipFull =
     intent.action === "implement_only" &&
     savedPlanContext != null &&
     savedPlanContext.protoPath != null &&
     savedPlanContext.testDir != null;
 
-  if (skipResolve && savedPlanContext) {
+  if (skipFull && savedPlanContext) {
     state.infrastructure = {
       service: intent.service,
       protoPath: savedPlanContext.protoPath,
@@ -44,77 +49,54 @@ export async function runSetupPhases(
     };
     state.contract = parseContract(savedPlanContext.protoPath, intent.service);
     state.coverage = analyzeCoverage(state.contract, skillTradePath);
-    log(state, "Using saved plan context (skipping resolve/parse/coverage)");
-
-    transition(state, "resolve",   "restored from saved plan");
-    transition(state, "parse",     "restored from saved plan");
-    transition(state, "coverage",  "restored from saved plan");
-    transition(state, "plan",      "restored from saved plan");
-    for (const phase of ["resolve", "parse", "coverage", "plan"] as const) {
-      emitPipelineEvent("log", state.runId, { phase, message: "(restored from saved plan)", elapsed: 0, cost: 0 });
-      emitPipelineEvent("phase", state.runId, { phase, status: "complete" });
-    }
+    log(state, "Using saved plan context");
+    emitPipelineEvent("phase", state.runId, { phase: "understand", status: "complete", stateSnapshot: serializeStateSnapshot(state), tools: [] });
+    transition(state, "plan", "restored from saved plan");
+    emitPipelineEvent("phase", state.runId, { phase: "plan", status: "pending" });
     return state;
   }
 
-  // ─── Phase: Resolve ──────────────────────────────────────
-  checkAbort(signal);
-  transition(state, "resolve", `starting setup for action=${intent.action}`);
-  log(state, "Resolving service infrastructure...");
+  // ─── Full understand ─────────────────────────────────────
+  try {
+    const ctx = await understand(intent, skillTradePath);
+    state.understandContext = ctx;
 
-  state.infrastructure = resolveService(intent.service, skillTradePath);
+    // Propagate to RunState fields used by plan/implement
+    state.service       = ctx.canonicalService;
+    state.intent        = ctx.intent;
+    state.infrastructure = ctx.infrastructure;
+    state.contract      = ctx.contract;
+    state.coverage      = ctx.coverage;
 
-  ledgerFacts.push({
-    what: `Service ${intent.service}: ${state.infrastructure.missingComponents.length} missing components`,
-    source: "resolve-service",
-    confirmed: true,
-  });
+    const parts: string[] = [
+      `proto: ${ctx.protoFile}`,
+      `methods: ${ctx.contract.methods.length}`,
+      `coverage: ${ctx.coverage.coveragePercent}%`,
+      `localTests: ${ctx.localTestFilesCount}`,
+      `scope: ${ctx.scope}`,
+    ];
+    if (ctx.protoChanges) {
+      const c = ctx.protoChanges;
+      parts.push(`protoChanges: +${c.addedMethods.length} ~${c.changedMethods.length} -${c.removedMethods.length}`);
+    }
+    if (ctx.testomatioCoverage) {
+      const t = ctx.testomatioCoverage;
+      parts.push(`testomatio: ${t.manualTests} manual / ${t.automatedTests} auto`);
+    }
 
-  if (state.infrastructure.missingComponents.includes("proto")) {
-    throw new Error(`Proto file not found for service "${intent.service}" even after sync attempt`);
+    log(state, parts.join(", "));
+    state.notes.push({ phase: "understand", summary: parts.join("; ") });
+    ledgerFacts.push({
+      what: `Understand: ${parts.join("; ")}`,
+      source: "service-map+proto+testomatio",
+      confirmed: true,
+    });
+
+  } catch (err) {
+    throw new Error(`Understand failed: ${(err as Error).message}`);
   }
 
-  state.notes.push({
-    phase: "resolve",
-    summary: `wrapper: ${state.infrastructure.wrapperPath ? "exists" : "absent"}. missing: [${state.infrastructure.missingComponents.join(", ") || "none"}]`,
-  });
-
-  // ─── Phase: Parse ────────────────────────────────────────
-  checkAbort(signal);
-  transition(state, "parse", `resolve done: protoPath=${state.infrastructure.protoPath}, missing=[${state.infrastructure.missingComponents.join(", ") || "none"}]`);
-  log(state, "Parsing proto contract...");
-
-  state.contract = parseContract(state.infrastructure.protoPath, intent.service);
-  ledgerFacts.push({
-    what: `Contract: ${state.contract.methods.length} methods, ${state.contract.messages.length} messages`,
-    source: state.infrastructure.protoPath,
-    confirmed: true,
-  });
-  log(state, `Found ${state.contract.methods.length} methods: ${state.contract.methods.map((m) => m.name).join(", ")}`);
-
-  state.notes.push({
-    phase: "parse",
-    summary: `methods: [${state.contract.methods.map((m) => m.name).join(", ")}]`,
-  });
-
-  // ─── Phase: Coverage ─────────────────────────────────────
-  checkAbort(signal);
-  transition(state, "coverage", `parse done: ${state.contract.methods.length} methods found`);
-  log(state, "Analyzing test coverage...");
-
-  state.coverage = analyzeCoverage(state.contract, skillTradePath);
-  ledgerFacts.push({
-    what: `Coverage: ${state.coverage.coveragePercent}% (${state.coverage.coveredMethods.length}/${state.coverage.totalMethods})`,
-    source: "analyze-coverage",
-    confirmed: true,
-  });
-  log(state, `Coverage: ${state.coverage.coveragePercent}% — uncovered: ${state.coverage.uncoveredMethods.join(", ") || "none"}`);
-
-  state.notes.push({
-    phase: "coverage",
-    summary: `coverage: ${state.coverage.coveragePercent}%. uncovered: [${state.coverage.uncoveredMethods.join(", ") || "none"}]`,
-  });
-
+  emitPipelineEvent("phase", state.runId, { phase: "understand", status: "complete", stateSnapshot: serializeStateSnapshot(state), tools: [] });
   return state;
 }
 

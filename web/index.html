@@ -5,6 +5,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AQA Agent</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
   <style>
     *,
     *::before,
@@ -288,6 +291,11 @@
       border-radius: 10px;
     }
 
+    .chat-msg .welcome-block--alert {
+      background: rgba(239,68,68,.06);
+      border-color: rgba(239,68,68,.35);
+    }
+
     .chat-msg .welcome-title {
       font-size: 11px;
       font-weight: 600;
@@ -295,6 +303,10 @@
       letter-spacing: .05em;
       color: var(--warning);
       margin-bottom: 6px;
+    }
+
+    .chat-msg .welcome-title--alert {
+      color: #ef4444;
     }
 
     .chat-msg .welcome-list {
@@ -705,7 +717,16 @@
     }
 
     .header-pipeline .phase-cost {
-      display: none;
+      display: block;
+      font-size: 10px;
+      font-family: var(--mono);
+      color: var(--text-4);
+      margin-top: 1px;
+    }
+
+    .header-pipeline .pipeline-phase.complete .phase-cost {
+      color: var(--success);
+      opacity: 0.8;
     }
 
     .header-pipeline .phase-icon {
@@ -812,6 +833,10 @@
     .log-msg {
       color: var(--text-3);
       word-break: break-word;
+    }
+
+    .log-phase[data-p="understand"] {
+      color: #a78bfa;
     }
 
     .log-phase[data-p="resolve"] {
@@ -1033,6 +1058,39 @@
       border: 1px solid var(--border);
     }
 
+    details.method-card {
+      display: block;
+      padding: 0;
+    }
+
+    details.method-card > summary {
+      padding: 6px 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      list-style: none;
+    }
+
+    details.method-card > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    details.method-card > summary::before {
+      content: '▶';
+      font-size: 9px;
+      color: var(--text-4);
+      transition: transform .15s;
+      flex-shrink: 0;
+      width: 12px;
+      text-align: center;
+    }
+
+    details.method-card[open] > summary::before {
+      transform: rotate(90deg);
+      color: var(--accent);
+    }
+
     .method-card.analyzed {
       border-color: rgba(6, 182, 212, .3);
     }
@@ -1046,10 +1104,11 @@
     }
 
     .method-status {
-      width: 18px;
+      width: 16px;
       text-align: center;
       flex-shrink: 0;
-      font-size: 13px;
+      font-size: 12px;
+      line-height: 1.6;
     }
 
     .method-body {
@@ -1059,9 +1118,9 @@
 
     .method-name {
       flex: 1;
-      font-size: 12px;
+      font-size: 11.5px;
       font-family: var(--mono);
-      color: var(--text-2);
+      color: var(--text-1);
     }
 
     .method-note {
@@ -1104,24 +1163,66 @@
     }
 
     .plan-case {
-      margin-top: 6px;
-      padding-top: 6px;
+      margin-top: 4px;
       border-top: 1px solid var(--border);
+      cursor: pointer;
     }
 
     .plan-case:first-of-type {
       border-top: none;
-      padding-top: 2px;
     }
+
+    .plan-case summary {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      padding: 4px 0 2px;
+      list-style: none;
+      cursor: pointer;
+    }
+
+    .plan-case summary::-webkit-details-marker { display: none; }
+
+    .plan-case[open] summary .plan-case-title::before { content: '▼ '; font-size: 8px; }
+    .plan-case:not([open]) summary .plan-case-title::before { content: '▶ '; font-size: 8px; color: var(--text-4); }
 
     .plan-case-title {
       color: var(--text-2);
+      font-size: 11.5px;
     }
 
     .plan-case-meta {
       color: var(--text-4);
       font-family: var(--mono);
       font-size: 10px;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+
+    .plan-case-body {
+      padding: 4px 0 6px 14px;
+      font-size: 11px;
+      color: var(--text-3);
+      line-height: 1.6;
+    }
+
+    .test-code-pre {
+      background: var(--bg-2) !important;
+      border-radius: 4px;
+      padding: 10px 14px;
+      font-family: var(--mono);
+      font-size: 10.5px;
+      overflow-x: auto;
+      line-height: 1.6;
+      white-space: pre;
+      margin: 6px 0;
+    }
+
+    .test-code-pre .hljs {
+      background: transparent;
+      padding: 0;
+      font-size: inherit;
+      line-height: inherit;
     }
 
     .content-sidebar .pipeline-section {
@@ -1170,35 +1271,52 @@
       gap: 10px;
     }
 
-    /* ─── Phase Inspector tabs ─── */
-    .inspector-tabs {
-      display: flex;
-      gap: 2px;
-      padding: 6px 10px 0;
+    /* ─── Phase Inspector accordion ─── */
+    .accordion-section {
       border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
     }
 
-    .inspector-tab {
+    .accordion-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 14px;
+      cursor: pointer;
+      user-select: none;
       font-size: 11px;
       font-weight: 500;
-      padding: 4px 10px;
-      background: transparent;
-      border: none;
-      border-bottom: 2px solid transparent;
       color: var(--text-4);
-      cursor: pointer;
-      transition: color .15s, border-color .15s;
-      margin-bottom: -1px;
+      transition: color .15s, background .15s;
     }
 
-    .inspector-tab:hover {
+    .accordion-header:hover {
       color: var(--text-2);
+      background: var(--bg-2);
     }
 
-    .inspector-tab.active {
+    .accordion-header.open {
       color: var(--accent);
-      border-bottom-color: var(--accent);
+    }
+
+    .accordion-arrow {
+      font-size: 9px;
+      color: var(--text-4);
+      transition: transform .15s;
+      line-height: 1;
+    }
+
+    .accordion-header.open .accordion-arrow {
+      transform: rotate(90deg);
+      color: var(--accent);
+    }
+
+    .accordion-body {
+      display: none;
+      border-top: 1px solid var(--border);
+    }
+
+    .accordion-body.open {
+      display: block;
     }
 
     .inspector-subtitle {
@@ -1336,26 +1454,12 @@
     </div>
     <div class="header-pipeline">
       <div class="pipeline" id="pipeline">
-        <div class="pipeline-phase" data-phase="resolve" onclick="selectPhase('resolve')">
+        <div class="pipeline-phase" data-phase="understand" onclick="selectPhase('understand')">
           <div class="phase-icon">○</div>
           <div class="phase-body">
-            <div class="phase-label">Resolve</div>
-            <div class="phase-detail">Find service infrastructure</div>
-          </div><span class="phase-cost" data-cost-phase="resolve"></span>
-        </div>
-        <div class="pipeline-phase" data-phase="parse" onclick="selectPhase('parse')">
-          <div class="phase-icon">○</div>
-          <div class="phase-body">
-            <div class="phase-label">Parse</div>
-            <div class="phase-detail">Parse proto contract</div>
-          </div><span class="phase-cost" data-cost-phase="parse"></span>
-        </div>
-        <div class="pipeline-phase" data-phase="coverage" onclick="selectPhase('coverage')">
-          <div class="phase-icon">○</div>
-          <div class="phase-body">
-            <div class="phase-label">Coverage</div>
-            <div class="phase-detail">Analyze test coverage</div>
-          </div><span class="phase-cost" data-cost-phase="coverage"></span>
+            <div class="phase-label">Understand</div>
+            <div class="phase-detail">Resolve service context</div>
+          </div><span class="phase-cost" data-cost-phase="understand"></span>
         </div>
         <div class="pipeline-phase" data-phase="plan" onclick="selectPhase('plan')">
           <div class="phase-icon">○</div>
@@ -1436,13 +1540,6 @@
             <span id="inspectorSubtitle" class="inspector-subtitle">No phase selected</span>
           </div>
         </div>
-        <div class="inspector-tabs">
-          <button class="inspector-tab active" data-tab="overview"
-            onclick="switchInspectorTab('overview')">Overview</button>
-          <button class="inspector-tab" data-tab="output" onclick="switchInspectorTab('output')">Output</button>
-          <button class="inspector-tab" data-tab="messages" onclick="switchInspectorTab('messages')">Messages</button>
-          <button class="inspector-tab" data-tab="request" onclick="switchInspectorTab('request')">Request</button>
-        </div>
         <div id="inspectorContent" class="inspector-content">
           <div class="empty-state">Select a phase from the header pipeline to inspect details.</div>
         </div>
@@ -1489,19 +1586,21 @@
   <script>
     const $ = id => document.getElementById(id);
     const PHASE_DEFAULTS = {
-      resolve: 'Find service infrastructure', parse: 'Parse proto contract',
-      coverage: 'Analyze test coverage', plan: 'Generate test plans',
+      understand: 'Resolve service context',
+      plan: 'Generate test plans',
       implement: 'Write test code', validate: 'Run tests',
       debug: 'Fix failures', done: 'Pipeline finished',
     };
 
     let activePhase = null;
     let completedPhases = new Set();
+    let phaseStartCost = {};
+    let lastTotalCost = 0;
     let logCount = 0;
     let services = [];
     let protoSyncReport = null;
     let selectedPhase = null;
-    let activeInspectorTab = 'overview';
+    let openAccordions = new Set(['output']);
     let currentIntent = null;
     const phaseData = {}; // { [phase]: { status, messages: [{elapsed, message, isThinking}], summary } }
     const CHAT_STORAGE_KEY = 'aqa-agent-chat-v1';
@@ -1535,8 +1634,11 @@
     }
 
     function onPhase(ev) {
-      const { phase, status } = ev.data;
+      const { phase, status, stateSnapshot, tools } = ev.data;
       if (status === 'complete') markPhase(phase, 'complete');
+      if (stateSnapshot) { const pd = ensurePhaseData(phase); pd.stateSnapshot = stateSnapshot; }
+      if (tools !== undefined) { const pd = ensurePhaseData(phase); pd.tools = tools; }
+      if (selectedPhase === phase) renderInspectorTabContent();
     }
 
     function onStarted(ev) {
@@ -1545,12 +1647,11 @@
       $('pipelineStatus').textContent = ev.data.action + ' ' + ev.data.service;
       $('footerLeft').textContent = `Running: ${ev.data.service}`;
       $('footerRight').textContent = '';
-      activePhase = null; completedPhases.clear(); logCount = 0;
+      activePhase = null; completedPhases.clear(); logCount = 0; phaseStartCost = {}; lastTotalCost = 0;
       currentIntent = ev.data;
       for (const k in phaseData) delete phaseData[k];
-      selectedPhase = null;
       document.querySelectorAll('.pipeline-phase').forEach(el => el.classList.remove('selected'));
-      renderInspector();
+      selectPhase('understand');
       resetPipeline();
       $('logStream').innerHTML = '';
       $('logCount').textContent = '0';
@@ -1572,10 +1673,22 @@
       if (!isThinking) {
         if (phase !== activePhase && phase !== 'init' && phase !== 'save' && phase !== 'report') {
           if (activePhase) markPhase(activePhase, 'complete');
+          // Record cost at phase start for delta tracking
+          if (phase !== 'done' && phase !== 'failed') {
+            phaseStartCost[phase] = phaseStartCost[phase] ?? lastTotalCost;
+          }
           activePhase = phase;
           if (phase !== 'done' && phase !== 'failed') markPhase(phase, 'active');
         }
-        if (cost !== undefined && cost !== null) $('costTotal').textContent = '$' + cost.toFixed(4);
+        if (cost !== undefined && cost !== null) {
+          $('costTotal').textContent = '$' + cost.toFixed(4);
+          lastTotalCost = cost;
+          // Update current phase cost in real-time
+          if (activePhase && phaseStartCost[activePhase] !== undefined) {
+            const phaseDelta = cost - phaseStartCost[activePhase];
+            if (phaseDelta > 0) updatePhaseCost(activePhase, phaseDelta);
+          }
+        }
         updatePhaseDetail(phase, message);
       }
       appendLog(elapsed, phase, message, !!isThinking);
@@ -1603,6 +1716,8 @@
       const pidx = pd.methods.findIndex(m => m.method === method.method);
       if (pidx >= 0) pd.methods[pidx] = method;
       else pd.methods.push(method);
+      // Store latest state snapshot for State tab
+      if (ev.data.stateSnapshot) pd.stateSnapshot = ev.data.stateSnapshot;
       if (selectedPhase === phase) renderInspectorTabContent();
     }
 
@@ -1632,6 +1747,7 @@
       $('footerRight').textContent = `${((ev.data.durationMs || 0) / 1000).toFixed(1)}s · ${(tokens / 1000).toFixed(1)}K tokens`;
       fetchHistory();
       activePhase = null;
+      selectPhase('understand');
       saveDashboardState({
         methods: ev.data.methods || [],
         costByAgent: ev.data.costByAgent || null,
@@ -1701,11 +1817,9 @@
       renderInspectorTabContent();
     }
 
-    function switchInspectorTab(tab) {
-      activeInspectorTab = tab;
-      document.querySelectorAll('.inspector-tab').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.tab === tab);
-      });
+    function toggleAccordion(section) {
+      if (openAccordions.has(section)) openAccordions.delete(section);
+      else openAccordions.add(section);
       renderInspectorTabContent();
     }
 
@@ -1733,81 +1847,94 @@
       }
       const pd = phaseData[selectedPhase] || { status: 'pending', messages: [], summary: '' };
 
-      switch (activeInspectorTab) {
-        case 'overview': {
-          const statusColor = pd.status === 'complete' ? 'var(--success)'
-            : pd.status === 'active' ? 'var(--accent)'
-              : pd.status === 'failed' ? 'var(--error)' : 'var(--text-4)';
-          const statusIcon = pd.status === 'complete' ? '✓' : pd.status === 'active' ? '●' : pd.status === 'failed' ? '✗' : '○';
-          content.innerHTML = `
-            <div class="inspector-overview">
-              <div class="inspector-status">
-                <span style="color:${statusColor};font-size:14px">${statusIcon}</span>
-                <span style="color:${statusColor};font-weight:600;text-transform:capitalize">${pd.status}</span>
-              </div>
-              ${pd.summary
-              ? `<div class="inspector-summary">${esc(pd.summary)}</div>`
-              : '<div class="empty-state" style="padding:10px 0">No activity yet</div>'}
-            </div>`;
-          break;
+      const PHASE_TOOLS = {
+        understand: [], plan: ['read_file'],
+        implement: ['read_file', 'write_file', 'list_files', 'grep_files', 'run_command'],
+        validate: [], debug: ['read_file', 'write_file', 'list_files', 'grep_files', 'run_command'], done: [],
+      };
+      const TOOL_DESC = {
+        read_file: 'Reads file by path',
+        write_file: 'Writes content to file',
+        list_files: 'Finds files by glob pattern',
+        grep_files: 'Searches file contents via regex',
+        run_command: 'Executes a shell command',
+      };
+
+      function renderSectionOutput() {
+        if (selectedPhase === 'understand') {
+          return renderUnderstandMethods(pd.stateSnapshot);
         }
-        case 'output': {
-          const DETERMINISTIC = ['resolve', 'parse', 'coverage'];
-          if (DETERMINISTIC.includes(selectedPhase)) {
-            // Deterministic phases: show summary text
-            content.innerHTML = pd.summary
-              ? `<div class="inspector-overview"><div class="inspector-summary">${esc(pd.summary)}</div></div>`
-              : '<div class="empty-state">No output for this phase</div>';
-            break;
-          }
-          const outMethods = pd.methods || [];
-          if (!outMethods.length) {
-            content.innerHTML = '<div class="empty-state">No output yet — results appear here as methods are processed</div>';
-            break;
-          }
-          const html = outMethods.map(m => renderOutputMethod(m)).join('');
-          content.innerHTML = `<div class="methods-list">${html}</div>`;
-          break;
-        }
-        case 'messages': {
-          if (!pd.messages?.length) {
-            content.innerHTML = '<div class="empty-state">No messages for this phase</div>';
-            return;
-          }
-          const html = pd.messages.map(m => {
-            if (m.isThinking) {
-              return `<details class="thinking-details">
-                <summary><span class="thinking-badge">🧠 thinking</span><span class="log-phase" data-p="${esc(selectedPhase)}">${esc(selectedPhase)}</span></summary>
-                <pre class="thinking-pre">${esc(m.message)}</pre>
-              </details>`;
-            }
-            return `<div class="log-entry">
-              <span class="log-time">${m.elapsed}s</span>
-              <span class="log-phase" data-p="${esc(selectedPhase)}">${esc(selectedPhase)}</span>
-              <span class="log-msg">${esc(m.message)}</span>
-            </div>`;
-          }).join('');
-          content.innerHTML = `<div class="inspector-messages">${html}</div>`;
-          break;
-        }
-        case 'request': {
-          if (!currentIntent) {
-            content.innerHTML = '<div class="empty-state">No run started yet</div>';
-          } else {
-            const rows = [
-              ['Action', currentIntent.action || '—'],
-              ['Service', currentIntent.service || '—'],
-              ['Methods', currentIntent.methods?.join(', ') || 'all'],
-            ];
-            content.innerHTML = `<div class="inspector-request">${rows.map(([k, v]) => `<div class="inspector-request-row">
-                <span class="inspector-request-key">${k}</span>
-                <span class="inspector-request-val">${esc(String(v))}</span>
-              </div>`).join('')
-              }</div>`;
-          }
-          break;
-        }
+        const outMethods = pd.methods || [];
+        if (!outMethods.length) return '<div class="empty-state">No output yet — results appear here as methods are processed</div>';
+        return `<div class="methods-list">${outMethods.map(m => renderOutputMethod(m)).join('')}</div>`;
       }
+
+      function renderSectionMessages() {
+        if (!pd.messages?.length) return '<div class="empty-state">No messages for this phase</div>';
+        return `<div class="inspector-messages">${pd.messages.map(m => {
+          if (m.isThinking) return `<details class="thinking-details"><summary><span class="thinking-badge">🧠 thinking</span><span class="log-phase" data-p="${esc(selectedPhase)}">${esc(selectedPhase)}</span></summary><pre class="thinking-pre">${esc(m.message)}</pre></details>`;
+          return `<div class="log-entry"><span class="log-time">${m.elapsed}s</span><span class="log-phase" data-p="${esc(selectedPhase)}">${esc(selectedPhase)}</span><span class="log-msg">${esc(m.message)}</span></div>`;
+        }).join('')}</div>`;
+      }
+
+      function renderSectionState() {
+        const snap = pd.stateSnapshot;
+        if (!snap) return '<div class="empty-state">No state data yet</div>';
+        const rows = [
+          ['Service', snap.service], ['Phase', snap.phase], ['Action', snap.intent?.action],
+          ['Proto', snap.infrastructure?.protoPath?.split('/').pop()],
+          ['Test dir', snap.infrastructure?.testDir?.split('/').slice(-3).join('/')],
+          ['Coverage', snap.coverage ? `${snap.coverage.coveragePercent}% (${snap.coverage.coveredMethods?.length ?? 0}/${snap.coverage.totalMethods})` : null],
+          ['Scope', snap.understand?.scope ?? null],
+          ['Local tests', snap.understand?.localTestFilesCount ?? null],
+          ['Testomatio', snap.understand?.testomatio ? `${snap.understand.testomatio.manual} manual / ${snap.understand.testomatio.auto} auto` : null],
+          ['Proto changes', snap.understand?.protoChanges ? `+${snap.understand.protoChanges.added?.length ?? 0} ~${snap.understand.protoChanges.changed?.length ?? 0} -${snap.understand.protoChanges.removed?.length ?? 0}` : null],
+          ['Methods done', snap.methodResults?.length ? `${snap.methodResults.length} (${snap.methodResults.filter(m => m.status === 'passed').length} passed)` : null],
+          ['Cost', snap.totalCost !== undefined ? `$${Number(snap.totalCost).toFixed(4)}` : null],
+        ].filter(([, v]) => v !== null && v !== undefined && v !== '');
+        return `<div class="inspector-request">${rows.map(([k, v]) =>
+          `<div class="inspector-request-row"><span class="inspector-request-key">${esc(String(k))}</span><span class="inspector-request-val">${esc(String(v))}</span></div>`
+        ).join('')}</div>`;
+      }
+
+      function renderSectionTools() {
+        const tools = pd.tools ?? PHASE_TOOLS[selectedPhase] ?? [];
+        if (!tools.length) return '<div class="empty-state">Deterministic phase — no LLM tools used</div>';
+        return `<div class="inspector-request">${tools.map(t =>
+          `<div class="inspector-request-row"><span class="inspector-request-key" style="font-family:monospace;min-width:120px">${esc(t)}</span><span class="inspector-request-val" style="color:var(--text-2)">${esc(TOOL_DESC[t] ?? '')}</span></div>`
+        ).join('')}</div>`;
+      }
+
+      function renderSectionNotes() {
+        const notes = pd.stateSnapshot?.notes;
+        if (!notes?.length) return '<div class="empty-state">No notes yet</div>';
+        return `<div class="inspector-messages">${notes.map(n => {
+          const isTransition = n.summary.startsWith('→ ');
+          return `<div class="log-entry"${isTransition ? ' style="opacity:0.45"' : ''}>` +
+            `<span class="log-phase" data-p="${esc(n.phase)}">${esc(n.phase)}</span>` +
+            `<span class="log-msg"${isTransition ? ' style="font-style:italic"' : ''}>${esc(n.summary)}</span>` +
+            `</div>`;
+        }).join('')}</div>`;
+      }
+
+      const sections = [
+        { key: 'messages', label: 'Log',    render: renderSectionMessages },
+        { key: 'notes',    label: 'Notes',  render: renderSectionNotes },
+        { key: 'state',    label: 'State',  render: renderSectionState },
+        { key: 'tools',    label: 'Tools',  render: renderSectionTools },
+        { key: 'output',   label: 'Output', render: renderSectionOutput },
+      ];
+
+      content.innerHTML = sections.map(s => {
+        const isOpen = openAccordions.has(s.key);
+        return `<div class="accordion-section">
+          <div class="accordion-header${isOpen ? ' open' : ''}" onclick="toggleAccordion('${s.key}')">
+            <span class="accordion-arrow">▶</span>
+            <span>${s.label}</span>
+          </div>
+          <div class="accordion-body${isOpen ? ' open' : ''}">${isOpen ? s.render() : ''}</div>
+        </div>`;
+      }).join('');
     }
 
     function updatePhaseDetail(p, msg) {
@@ -2213,22 +2340,29 @@
       if (!el) return;
       if (!methods?.length) { el.innerHTML = '<div class="empty-state">No methods</div>'; return; }
       el.innerHTML = methods.map(m => {
-        const icon = m.status === 'passed' ? '✅' : m.status === 'failed' ? '❌' : m.status === 'planned' ? '📋' : m.status === 'analyzed' ? '🔎' : m.status === 'skipped' ? '⏭' : '⬜';
-        const cls = m.status === 'passed' ? ' passed' : m.status === 'failed' ? ' failed' : m.status === 'analyzed' ? ' analyzed' : '';
+        const icon = statusIcon(m.status);
+        const cls  = m.status === 'passed' ? ' passed' : m.status === 'failed' ? ' failed' : m.status === 'analyzed' ? ' analyzed' : '';
         const cost = m.status === 'analyzed' ? 'uncovered' : (m.cost ? '$' + m.cost.toFixed(4) : '—');
-        const att = m.attempts > 1 ? ` (${m.attempts}x)` : '';
+        const att  = m.attempts > 1 ? ` <span style="color:var(--warning);font-size:10px">(${m.attempts}x)</span>` : '';
+        const countLabel = m.plan ? `${m.plan.totalCases} cases · ` : '';
+        const meta = `${countLabel}${cost}`;
         const note = m.status === 'analyzed' ? '<div class="method-note">Coverage gap found during analysis</div>' : '';
-        const plan = m.plan
-          ? `<details class="method-plan"><summary>Plan: ${m.plan.totalCases} test cases</summary>` +
-          `<div class="plan-file">${esc(m.plan.fileName || '')}</div>` +
-          renderPlanCase(m.plan.schemaTest, true) +
-          (m.plan.testCases || []).map(tc => renderPlanCase(tc, false)).join('') +
-          `</details>`
-          : '';
+        const planBody = m.plan
+          ? (m.plan.fileName ? `<div class="plan-file">${esc(m.plan.fileName)}</div>` : '') +
+            renderPlanCase(m.plan.schemaTest, true, m.testCode) +
+            (m.plan.testCases || []).map(tc => renderPlanCase(tc, false, m.testCode)).join('')
+          : null;
+        if (planBody) {
+          return `<details class="method-card${cls}">` +
+            `<summary><span class="method-name">${esc(m.method)}${att}</span><span class="method-meta" style="margin-left:auto">${meta}</span></summary>` +
+            `<div style="padding:4px 10px 8px 10px;border-top:1px solid var(--border)">${note}${planBody}</div>` +
+            `</details>`;
+        }
         return `<div class="method-card${cls}">` +
           `<span class="method-status">${icon}</span>` +
-          `<div class="method-body"><div class="method-name">${esc(m.method)}</div>${note}${plan}</div>` +
-          `<span class="method-meta">${cost}${att}</span></div>`;
+          `<span class="method-name">${esc(m.method)}${att}</span>` +
+          `${note}<span class="method-meta" style="margin-left:auto">${meta}</span>` +
+          `</div>`;
       }).join('');
     }
 
@@ -2327,32 +2461,148 @@
       return `Done! ${service} pipeline finished. Cost: $${totalCost.toFixed(4)}`;
     }
 
-    function renderPlanCase(testCase, isSchema) {
+    function extractTestSnippet(testCode, testCase) {
+      if (!testCode || !testCase) return null;
+      // search by ID first, then by name fragment
+      const needle = testCase.id
+        ? testCase.id
+        : (testCase.name || '').substring(0, 40);
+      if (!needle) return null;
+      const lines = testCode.split('\n');
+      const startIdx = lines.findIndex(l => l.includes(needle));
+      if (startIdx === -1) return null;
+      // find the test() opening line (may be same or 1 line before)
+      let open = startIdx;
+      while (open > 0 && !lines[open].match(/^\s*(test|it)\s*\(/)) open--;
+      // walk forward counting braces to find the closing
+      let depth = 0, end = open;
+      for (let i = open; i < lines.length; i++) {
+        for (const ch of lines[i]) {
+          if (ch === '{') depth++;
+          else if (ch === '}') depth--;
+        }
+        end = i;
+        if (depth === 0 && i > open) break;
+      }
+      return lines.slice(open, end + 1).join('\n');
+    }
+
+    function renderPlanCase(testCase, isSchema, testCode) {
       if (!testCase) return '';
       const type = isSchema ? 'schema' : (testCase.type || 'case');
-      return `<div class="plan-case">` +
-        `<div class="plan-case-title">${esc(testCase.name || 'Unnamed case')}</div>` +
-        `<div class="plan-case-meta">${esc(type)} · ${esc(testCase.priority || 'P?')}</div>` +
-        `<div>${esc(testCase.description || '')}</div>` +
-        `</div>`;
+      const id = testCase.id ? `<span style="color:var(--text-4);font-size:10px;margin-right:6px">${esc(testCase.id)}</span>` : '';
+      const snippet = extractTestSnippet(testCode, testCase);
+      const body = snippet
+        ? `<pre class="test-code-pre" style="margin:0"><code class="hljs language-typescript">${hlts(snippet)}</code></pre>`
+        : [
+            testCase.description ? `<div style="margin-bottom:4px">${esc(testCase.description)}</div>` : '',
+            testCase.expectedBehavior ? `<div style="color:var(--text-3);font-size:10.5px">Expected: ${esc(testCase.expectedBehavior)}</div>` : '',
+          ].filter(Boolean).join('');
+      return `<details class="plan-case">` +
+        `<summary><span class="plan-case-title">${id}${esc(testCase.name || 'Unnamed case')}</span>` +
+        `<span class="plan-case-meta">${esc(type)} · ${esc(testCase.priority || 'P?')}</span></summary>` +
+        (body ? `<div class="plan-case-body" style="padding:0">${body}</div>` : '') +
+        `</details>`;
+    }
+
+    function statusIcon(status) {
+      if (status === 'passed')   return '<span style="color:#10b981">✓</span>';
+      if (status === 'failed')   return '<span style="color:#ef4444">✗</span>';
+      if (status === 'planned')  return '<span style="color:#06b6d4">◆</span>';
+      if (status === 'analyzed') return '<span style="color:#06b6d4">◎</span>';
+      if (status === 'skipped')  return '<span style="color:var(--text-4)">—</span>';
+      if (status === 'written')  return '<span style="color:#a78bfa">✎</span>';
+      return '<span style="color:var(--text-4)">○</span>';
     }
 
     function renderOutputMethod(m) {
-      const icon = m.status === 'passed' ? '✅' : m.status === 'failed' ? '❌' : m.status === 'planned' ? '📋' : m.status === 'analyzed' ? '🔎' : m.status === 'skipped' ? '⏭' : '⬜';
-      const cls = m.status === 'passed' ? ' passed' : m.status === 'failed' ? ' failed' : m.status === 'analyzed' ? ' analyzed' : '';
+      const icon = statusIcon(m.status);
+      const cls  = m.status === 'passed' ? ' passed' : m.status === 'failed' ? ' failed' : m.status === 'analyzed' ? ' analyzed' : '';
       const cost = m.cost ? '$' + m.cost.toFixed(4) : m.status === 'analyzed' ? 'uncovered' : '—';
-      const att = m.attempts > 1 ? ` <span style="color:var(--warning);font-size:10px">(${m.attempts}x)</span>` : '';
-      const plan = m.plan
-        ? `<details class="method-plan"><summary>📋 ${m.plan.totalCases} test case${m.plan.totalCases === 1 ? '' : 's'}</summary>` +
-        (m.plan.fileName ? `<div class="plan-file">${esc(m.plan.fileName)}</div>` : '') +
-        renderPlanCase(m.plan.schemaTest, true) +
-        (m.plan.testCases || []).map(tc => renderPlanCase(tc, false)).join('') +
-        `</details>`
-        : '';
+      const att  = m.attempts > 1 ? ` <span style="color:var(--warning);font-size:10px">(${m.attempts}x)</span>` : '';
+
+      // plan body — if testCode available, each case shows its code snippet instead of description
+      const planBody = m.plan
+        ? (m.plan.fileName ? `<div class="plan-file">${esc(m.plan.fileName)}</div>` : '') +
+          renderPlanCase(m.plan.schemaTest, true, m.testCode) +
+          (m.plan.testCases || []).map(tc => renderPlanCase(tc, false, m.testCode)).join('')
+        : null;
+
+      // code body — fallback when no plan
+      const codeBody = m.testCode && !m.plan
+        ? `<pre class="test-code-pre"><code class="hljs language-typescript">${hlts(m.testCode)}</code></pre>`
+        : (m.testFile && !m.plan ? `<div class="plan-file">${esc(m.testFile)}</div>` : null);
+
+      const expandBody = planBody || codeBody;
+
+      // right-side meta: count + cost
+      const countLabel = m.plan ? `${m.plan.totalCases} cases · ` : '';
+      const meta = `${countLabel}${cost}`;
+
+      if (expandBody) {
+        return `<details class="method-card${cls}">` +
+          `<summary>` +
+          `<span class="method-name">${esc(m.method)}${att}</span>` +
+          `<span class="method-meta" style="margin-left:auto">${meta}</span>` +
+          `</summary>` +
+          `<div style="padding:4px 10px 8px 10px;border-top:1px solid var(--border)">${expandBody}</div>` +
+          `</details>`;
+      }
+
       return `<div class="method-card${cls}">` +
         `<span class="method-status">${icon}</span>` +
-        `<div class="method-body"><div class="method-name">${esc(m.method)}${att}</div>${plan}</div>` +
-        `<span class="method-meta">${cost}</span></div>`;
+        `<span class="method-name">${esc(m.method)}${att}</span>` +
+        `<span class="method-meta" style="margin-left:auto">${meta}</span>` +
+        `</div>`;
+    }
+
+    function renderUnderstandMethods(snap) {
+      if (!snap?.contractMethods?.length) return '<div class="empty-state">No methods found</div>';
+      const messages = snap.contractMessages || [];
+
+      function findMessage(typeName) {
+        const short = typeName.includes('.') ? typeName.split('.').pop() : typeName;
+        return messages.find(msg => msg.name === short || msg.name === typeName);
+      }
+
+      function renderMessageBlock(typeName) {
+        const msg = findMessage(typeName);
+        if (!msg?.fields?.length) return '';
+        const short = typeName.includes('.') ? typeName.split('.').pop() : typeName;
+        const fieldLines = msg.fields.map(f => {
+          const modifier = f.repeated ? 'repeated ' : f.optional ? 'optional ' : '';
+          const typeStr = f.mapKeyType ? `map&lt;${esc(f.mapKeyType)}, ${esc(f.mapValueType)}&gt;` : esc(f.type);
+          return `  <span style="color:var(--text-4)">${modifier}</span><span style="color:#79c0ff">${typeStr}</span> <span style="color:var(--text-1)">${esc(f.name)}</span><span style="color:var(--text-4)"> = ${f.number};</span>`;
+        });
+        const oneofLines = (msg.oneofs || []).flatMap(o => [
+          `  <span style="color:var(--text-4)">oneof</span> <span style="color:var(--text-1)">${esc(o.name)}</span> {`,
+          ...o.fields.map(fn => `    <span style="color:var(--text-2)">${esc(fn)}</span>`),
+          `  }`,
+        ]);
+        return `<pre class="test-code-pre" style="margin:2px 0 0;font-size:10px;line-height:1.5;padding:6px 10px">` +
+          `<span style="color:var(--text-4)">message </span><span style="color:var(--accent)">${esc(short)}</span> {\n` +
+          [...fieldLines, ...oneofLines].join('\n') +
+          `\n}</pre>`;
+      }
+
+      return `<div class="methods-list">${snap.contractMethods.map(m => {
+        const covered = snap.coverage?.coveredMethods?.includes(m.name);
+        const coveredLabel = covered != null
+          ? `<span style="color:${covered ? '#10b981' : 'var(--text-4)'}">${covered ? 'covered' : 'uncovered'}</span>`
+          : '';
+        return `<details class="method-card">` +
+          `<summary>` +
+          `<span class="method-name">${esc(m.name)}</span>` +
+          `<span class="method-meta" style="margin-left:auto">${coveredLabel}</span>` +
+          `</summary>` +
+          `<div style="padding:2px 10px 8px 10px;border-top:1px solid var(--border)">` +
+          `<div style="margin:4px 0 2px"><span class="inspector-request-key">input</span> <span style="color:var(--text-3);font-size:10px">${esc(m.inputType)}</span></div>` +
+          renderMessageBlock(m.inputType) +
+          `<div style="margin:6px 0 2px"><span class="inspector-request-key">output</span> <span style="color:var(--text-3);font-size:10px">${esc(m.outputType)}</span></div>` +
+          renderMessageBlock(m.outputType) +
+          `</div>` +
+          `</details>`;
+      }).join('')}</div>`;
     }
 
     function renderPhaseCosts(costByPhase) {
@@ -2366,6 +2616,12 @@
 
     function clearPhaseCosts() {
       document.querySelectorAll('[data-cost-phase]').forEach(el => el.textContent = '');
+    }
+
+    function updatePhaseCost(phase, costUsd) {
+      document.querySelectorAll(`[data-cost-phase="${phase}"]`).forEach(el => {
+        el.textContent = costUsd > 0 ? '$' + costUsd.toFixed(4) : '';
+      });
     }
 
     function renderCostBreakdown(byAgent, total) {
@@ -2420,6 +2676,13 @@
         null,
         false
       );
+      if (protoSyncReport?.hasChanges) {
+        const services = (protoSyncReport.changedServices || []).map(c => c.service).join(', ');
+        addChatMsg('agent',
+          `⚠️ Proto contracts have changed${services ? ` — affected: ${services}` : ''}. Tests may be outdated. Sync the snapshot when ready.`,
+          null, null, false
+        );
+      }
     }
 
     function renderProtoSyncBlock(report) {
@@ -2436,7 +2699,7 @@
       const action = `
         <div class="welcome-actions">
           <button class="welcome-btn" onclick="updateTestsForProtoChanges()" ${report.hasChanges ? '' : 'disabled'}>Sync Tests With Proto Changes</button>
-          <button class="welcome-btn" onclick="updateProtoSnapshot()">Mark Contracts As Baseline</button>
+          <button class="welcome-btn" onclick="updateProtoSnapshot()">Save Proto Snapshot</button>
         </div>
       `;
       if (!report.hasChanges) {
@@ -2463,11 +2726,11 @@
       }).join('');
 
       return `
-        <div class="welcome-block">
-          <div class="welcome-title">Latest Proto Sync</div>
+        <div class="welcome-block welcome-block--alert">
+          <div class="welcome-title welcome-title--alert">⚠ Proto Changed — Tests May Be Outdated</div>
           <ul class="welcome-list">
             <li>${changedFiles.length} proto file(s) changed.</li>
-            <li>Updated services: ${esc(changedServices.map(change => change.service).join(', '))}</li>
+            <li>Affected services: ${esc(changedServices.map(change => change.service).join(', '))}</li>
             ${details}
             <li>Last synced: ${esc(syncedAt)}</li>
           </ul>
@@ -2584,6 +2847,15 @@
       return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
+    function hlts(code) {
+      if (!code) return '';
+      try {
+        return window.hljs
+          ? window.hljs.highlight(code, { language: 'typescript' }).value
+          : esc(code);
+      } catch { return esc(code); }
+    }
+
     // ─── Init ─────────────────────────────────────────────
 
     async function initApp() {
@@ -2595,7 +2867,7 @@
       await fetchServices();
       restoreChat();
       fetchHistory();
-      if (!selectedPhase) selectPhase('resolve');
+      if (!selectedPhase) selectPhase('understand');
     }
 
     initApp();

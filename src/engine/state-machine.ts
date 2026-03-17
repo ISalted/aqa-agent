@@ -5,10 +5,8 @@ import type { Phase, RunState, StepNote } from "../types.js";
 // because the same RunState is reused across multiple methods.
 
 export const PHASE_TRANSITIONS: Readonly<Record<Phase, readonly Phase[]>> = {
-  init:      ["resolve", "failed"],
-  resolve:   ["parse", "failed", "stopped"],
-  parse:     ["coverage", "failed", "stopped"],
-  coverage:  ["plan", "done", "failed", "stopped"],
+  init:       ["understand", "failed"],
+  understand: ["plan", "done", "failed", "stopped"],
   plan:      ["plan", "implement", "save", "done", "failed", "stopped"],
   implement: ["implement", "validate", "plan", "save", "failed", "stopped"],
   validate:  ["validate", "plan", "implement", "debug", "save", "done", "failed", "stopped"],

@@ -93,7 +93,7 @@ export async function parsePromptLLM(
       "Parse the user's request into a JSON object for a QA test automation agent.",
       `Available services: ${services.join(", ")}`,
       "Available actions: cover (full pipeline: write tests), analyze (coverage report only), plan (test plans only), fix (repair failures), implement_only (write from saved plans), validate_only (run tests only)",
-      "Action selection rules: if the user wants BOTH analysis AND implementation/tests → use 'cover'. Only use 'analyze' if the user explicitly wants only a coverage report with no implementation.",
+      "Action selection rules: if the user wants to write/implement/create tests → use 'cover' (full pipeline). Use 'implement_only' ONLY when user explicitly says 'from saved plan', 'implement only', or similar. Never choose 'implement_only' just because user says 'implement tests'.",
       'Return ONLY valid JSON: {"action":"...","service":"...","methods":null}',
       'If methods are mentioned, return them as an array: {"methods":["MethodName"]}',
       "If you cannot determine the service, return null.",

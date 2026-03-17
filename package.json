@@ -9,6 +9,7 @@
     "web": "tsx src/server.ts",
     "sync-protos": "tsx src/scripts/sync-protos.ts",
     "eval": "tsx src/scripts/run-eval.ts",
+    "test-understand": "tsx src/scripts/test-understand.ts",
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit"
   },

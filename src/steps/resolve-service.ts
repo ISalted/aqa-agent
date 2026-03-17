@@ -104,16 +104,30 @@ function checkFixtureConnection(skillTradePath: string, service: string): boolea
   return content.toLowerCase().includes(service.toLowerCase());
 }
 
-/** PascalCase → kebab-case (e.g. MissionEngine → mission-engine). */
+/** PascalCase → kebab-case, stripping common gRPC suffixes.
+ *  e.g. UsersGrpcService → users, MissionEngine → mission-engine */
 export function serviceNameToTestDirName(service: string): string {
-  const withHyphens = service.replace(/([A-Z])/g, "-$1").toLowerCase();
+  const stripped = service
+    .replace(/GrpcService$/i, "")
+    .replace(/Grpc$/i, "")
+    .replace(/Service$/i, "");
+  const withHyphens = stripped.replace(/([A-Z])/g, "-$1").toLowerCase();
   return withHyphens.startsWith("-") ? withHyphens.slice(1) : withHyphens;
 }
 
 function findTestDir(testRoot: string, service: string): string | null {
   if (!existsSync(testRoot)) return null;
+
+  // 1. exact match after normalization
   const expectedDirName = serviceNameToTestDirName(service);
   const candidatePath = join(testRoot, expectedDirName);
   if (existsSync(candidatePath)) return candidatePath;
+
+  // 2. fuzzy fallback — scan real dirs, pick the one that contains normalized name
+  const realDirs = globSync("*/", { cwd: testRoot });
+  const normalized = expectedDirName.replace(/-/g, "");
+  const fuzzy = realDirs.find((d) => d.replace(/-/g, "").replace(/\/$/, "") === normalized);
+  if (fuzzy) return join(testRoot, fuzzy.replace(/\/$/, ""));
+
   return null;
 }

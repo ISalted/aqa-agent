@@ -4,7 +4,7 @@ import { planTests } from "../steps/plan-tests.js";
 import { writeTests } from "../steps/write-tests.js";
 import { runTests } from "../steps/run-tests.js";
 import { debugTests } from "../steps/debug-tests.js";
-import { emitPipelineEvent } from "../events.js";
+import { emitPipelineEvent, serializeStateSnapshot } from "../events.js";
 import { transition } from "./state-machine.js";
 import type { RunState, MethodResult, TestPlan, LedgerAttempt } from "../types.js";
 
@@ -275,6 +275,7 @@ export async function processCover(
   const testFilePath = join(state.infrastructure!.testDir, basename(planToUse.fileName));
   writeFileSync(testFilePath, writeResult.code);
   methodResult.testFile = testFilePath;
+  methodResult.testCode = writeResult.code;
   methodResult.status = "written";
   log(state, `  File written: ${testFilePath}`);
   state.notes.push({
@@ -296,6 +297,7 @@ function createMethodResult(method: string): MethodResult {
 function emitMethodResult(state: RunState, methodResult: MethodResult): void {
   emitPipelineEvent("method-result", state.runId, {
     phase: state.phase,
+    stateSnapshot: serializeStateSnapshot(state),
     method: {
       method: methodResult.method,
       status: methodResult.status,
@@ -304,6 +306,7 @@ function emitMethodResult(state: RunState, methodResult: MethodResult): void {
       passed: methodResult.result?.passed ?? 0,
       failed: methodResult.result?.failed ?? 0,
       testFile: methodResult.testFile,
+      testCode: methodResult.testCode ?? null,
       plan: methodResult.plan ? {
         fileName: methodResult.plan.fileName,
         totalCases: methodResult.plan.testCases.length + 1,
