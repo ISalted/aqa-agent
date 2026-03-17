@@ -20,6 +20,7 @@ export interface WriteTestsResult {
   thinking?: string;
   savedNotes?: string[];
   phaseSummary?: string;
+  systemPrompt?: string;
 }
 
 /**
@@ -73,7 +74,7 @@ export async function writeTests(
   }
 
   const guardrailResult = validateGeneratedCode(code);
-  return { code, guardrailResult, thinking: result.thinking, savedNotes: result.savedNotes, phaseSummary: result.phaseSummary };
+  return { code, guardrailResult, thinking: result.thinking, savedNotes: result.savedNotes, phaseSummary: result.phaseSummary, systemPrompt: assembleSystemPrompt(context) };
 }
 
 function buildCoderPrompt(

@@ -11,15 +11,15 @@ import { createCheckers } from 'ts-interface-checker';
 
 test.describe('{ServiceName} — {MethodName}', () => {
 
-  test('Schema | Validate response', async ({ grpcClient }) => {
+  test('PREFIX-001: Schema validation for MethodName response', async ({ grpcClient }) => {
     // Schema validation — ALWAYS FIRST
   });
 
-  test('{METHOD-ID} | Happy path description', async ({ grpcClient }) => {
+  test('PREFIX-002: Happy path description', async ({ grpcClient }) => {
     // Positive test case
   });
 
-  test('{METHOD-ID} | Negative scenario', async ({ grpcClient }) => {
+  test('PREFIX-003: Negative scenario', async ({ grpcClient }) => {
     // Negative test case
   });
 });
@@ -27,12 +27,18 @@ test.describe('{ServiceName} — {MethodName}', () => {
 
 ## Test Naming
 
-Format: `{TEST-ID}: {Short description}`
-- TEST-ID: `{PREFIX}-{NNN}`
-- PREFIX: exactly 3 uppercase letters derived from the method/topic mnemonic
+Format: `{PREFIX}-{NNN}: {Short description}`
+- PREFIX: exactly 3 uppercase letters from the method name (see derivation rule below)
 - NNN: zero-padded sequence starting from `001`
-- The schema test is always first and must also use the same sequence
+- Schema test is always `PREFIX-001`
 - Do NOT use `Schema | ...`, `Positive | ...`, or unnumbered titles
+
+**Prefix derivation:** take first letter of each CamelCase word left to right.
+If fewer than 3 words, pad with next letters of the first word.
+- `UpdateClientWallet` → U+C+W → **UCW**
+- `GetClientWallets`   → G+C+W → **GCW**
+- `GetMission`         → G+M → pad → **GMI**
+- `CreateUser`         → C+U → pad → **CRU**
 
 Examples:
 - `UCW-001: Schema validation for UpdateClientWallet response`
@@ -40,7 +46,7 @@ Examples:
 - `GCW-001: Schema validation for GetClientWallets response`
 - `CRG-001: Cancel registration for registered account succeeds`
 
-The scenario type (`schema`, `positive`, `negative`, `boundary`, `edge`) belongs in metadata/plan fields, not in the human-readable test title prefix.
+The scenario type (`schema`, `positive`, `negative`, `boundary`, `edge`) belongs in metadata/plan fields, not in the human-readable test title.
 
 ## Service Wrapper Calls
 

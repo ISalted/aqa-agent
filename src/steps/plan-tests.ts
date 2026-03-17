@@ -18,6 +18,7 @@ export interface PlanTestsResult {
   thinking?: string;
   savedNotes?: string[];
   phaseSummary?: string;
+  systemPrompt?: string;
 }
 
 /**
@@ -65,7 +66,7 @@ export async function planTests(
   }
 
   const guardrailResult = validatePlan(plan);
-  return { plan, guardrailResult, thinking: result.thinking, savedNotes: result.savedNotes, phaseSummary: result.phaseSummary };
+  return { plan, guardrailResult, thinking: result.thinking, savedNotes: result.savedNotes, phaseSummary: result.phaseSummary, systemPrompt: assembleSystemPrompt(context) };
 }
 
 function buildPlannerPrompt(

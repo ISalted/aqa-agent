@@ -24,8 +24,8 @@ export function buildPlannerContext(
   skillTradePath: string,
   notes?: RunNotes,
 ): AgentContext {
-  const skills = loadSkills(["grpc-patterns", "schema-validation", "data-generation"]);
-  const projectRules = loadProjectRules(skillTradePath);
+  const skills = loadSkills(["grpc-patterns-plan", "test-coverage-rules"]);
+  const projectRules = loadPlannerProjectRules(skillTradePath);
   const exampleTest = pickBestExample(coverage.existingPatterns.exampleTestFiles);
   const wrapperCode = findWrapperCode(contract, skillTradePath);
   const failurePatterns = loadFailurePatterns();
@@ -145,6 +145,17 @@ function loadProjectRules(skillTradePath: string): string {
   return "No project rules found.";
 }
 
+function loadPlannerProjectRules(skillTradePath: string): string {
+  // Planner gets a trimmed context — no TypeScript patterns, no DevOps steps
+  const plannerRules = join(KB_DIR, "planner-project-rules.md");
+  if (existsSync(plannerRules)) {
+    return readFileSync(plannerRules, "utf-8");
+  }
+
+  // Fallback to full project rules if trimmed version not found
+  return loadProjectRules(skillTradePath);
+}
+
 // ─── Example Picker ─────────────────────────────────────────
 
 function pickBestExample(exampleFiles: string[]): string | undefined {
@@ -221,7 +232,7 @@ Return ONLY valid JSON — no markdown fences, no explanations:
 ## Rules
 - Always include a schema validation test first (id: PREFIX-001, type: schema, P1)
 - Minimum: 1 positive + 1 negative test case
-- Use EXACTLY 3 uppercase letters as prefix — never 4+. Take first letters of words: InsertOrReplaceMissionsGroup → IOR, InsertOrReplaceRewardPack → IRP, GetMission → GMI, CreateUser → CRU
+- Use EXACTLY 3 uppercase letters as prefix — never 4+. Take first letter of each CamelCase word left to right. If fewer than 3 words, pad with next letters of the first word: InsertOrReplaceMissionsGroup → IOR, InsertOrReplaceRewardPack → IOR, GetMission → GMI, CreateUser → CRU
 - P1 = critical (must have), P2 = important (should have), P3 = nice to have
 - 5-10 test cases total per method
 - Every test name must start with its full ID: "PREFIX-NNN: ..."`;

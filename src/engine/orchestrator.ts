@@ -14,7 +14,7 @@ import {
   processValidateOnly,
   processFix,
   processPlan,
-  processCover,
+  processImplement,
 } from "./pipeline-actions.js";
 import type {
   RunState,
@@ -131,12 +131,21 @@ export async function runPipeline(
         case "plan":
           methodResult = await processPlan(state, method, ctx);
           break;
-        case "implement_only":
-          methodResult = await processCover(state, method, ctx, savedPlansForResume![method]);
+        case "implement_only": {
+          methodResult = await processImplement(state, method, ctx, savedPlansForResume![method]);
           break;
-        default: // "run" — full pipeline: plan → implement → validate → debug
-          methodResult = await processCover(state, method, ctx);
+        }
+        default: { // null = full pipeline: plan → implement
+          const planResult = await processPlan(state, method, ctx);
+          if (planResult.plan) {
+            const implResult = await processImplement(state, method, ctx, planResult.plan);
+            implResult.cost += planResult.cost;
+            methodResult = implResult;
+          } else {
+            methodResult = planResult;
+          }
           break;
+        }
       }
 
       state.methodResults.push(methodResult);

@@ -155,6 +155,9 @@ export async function processPlan(
     state.notes,
   );
 
+  if (planResult.systemPrompt) {
+    emitPipelineEvent("system-prompt", state.runId, { phase: "plan", systemPrompt: planResult.systemPrompt });
+  }
   if (planResult.thinking) {
     emitPipelineEvent("log", state.runId, { phase: "plan", message: planResult.thinking, elapsed: 0, cost: 0, isThinking: true });
   }
@@ -179,78 +182,34 @@ export async function processPlan(
   return methodResult;
 }
 
-// ─── cover / implement_only ──────────────────────────────────
+// ─── implement ───────────────────────────────────────────────
 
-export async function processCover(
+export async function processImplement(
   state: RunState,
   method: string,
   ctx: MethodContext,
-  savedPlan?: TestPlan,
+  plan: TestPlan,
 ): Promise<MethodResult> {
   const methodResult = createMethodResult(method);
+  methodResult.plan = plan;
   const costBefore = state.cost.totalUsd;
 
-  let planToUse: TestPlan;
-
-  if (savedPlan) {
-    // implement_only: use saved plan
-    planToUse = savedPlan;
-    methodResult.plan = planToUse;
-    methodResult.status = "planned";
-    emitMethodResult(state, methodResult);
-  } else {
-    // cover: plan first
-    transition(state, "plan", `cover action: planning method=${method} (${ctx.methodIndex + 1}/${ctx.totalMethods})`);
-    log(state, `[${ctx.methodIndex + 1}/${ctx.totalMethods}] Planning: ${method}`);
-
-    const planResult = await planTests(
-      state.contract!,
-      state.coverage!,
-      method,
-      ctx.skillTradePath,
-      state.cost,
-      state.notes,
-    );
-
-    if (!planResult.plan) {
-      methodResult.status = "failed";
-      log(state, `  Plan FAILED: ${planResult.error}`);
-      ctx.ledgerAttempts.push({ step: "plan", method, result: "failure", cost: state.cost.totalUsd - costBefore, duration: 0, error: planResult.error });
-      emitMethodResult(state, methodResult);
-      methodResult.cost = state.cost.totalUsd - costBefore;
-      return methodResult;
-    }
-
-    if (!planResult.guardrailResult?.valid) {
-      log(state, `  Plan guardrail warnings: ${planResult.guardrailResult?.errors.join("; ")}`);
-    }
-
-    planToUse = planResult.plan;
-    methodResult.plan = planToUse;
-    methodResult.status = "planned";
-    log(state, `  Plan OK: ${planToUse.testCases.length + 1} test cases`);
-    if (planResult.savedNotes?.length) {
-      planResult.savedNotes.forEach((n) => state.notes.push({ phase: "plan", summary: n }));
-    } else {
-      state.notes.push({ phase: "plan", summary: `${planToUse.testCases.length + 1} test cases planned for ${method}.` });
-    }
-    emitMethodResult(state, methodResult);
-  }
-
-  // ─── Write ───────────────────────────────────────────────
-  transition(state, "implement", `plan OK: ${planToUse.testCases.length + 1} test cases for method=${method}`);
+  transition(state, "implement", `plan OK: ${plan.testCases.length + 1} test cases for method=${method}`);
   log(state, `[${ctx.methodIndex + 1}/${ctx.totalMethods}] Writing: ${method}`);
 
   const writeResult = await writeTests(
     state.contract!,
     state.coverage!,
-    planToUse,
+    plan,
     ctx.skillTradePath,
     state.cost,
     state.infrastructure!.testDir,
     state.notes,
   );
 
+  if (writeResult.systemPrompt) {
+    emitPipelineEvent("system-prompt", state.runId, { phase: "implement", systemPrompt: writeResult.systemPrompt });
+  }
   if (writeResult.thinking) {
     emitPipelineEvent("log", state.runId, { phase: "implement", message: writeResult.thinking, elapsed: 0, cost: 0, isThinking: true });
   }
@@ -264,14 +223,13 @@ export async function processCover(
   if (!writeResult.code) {
     methodResult.status = "failed";
     log(state, `  Write FAILED: ${writeResult.error}`);
-    emitMethodResult(state, methodResult);
     methodResult.cost = state.cost.totalUsd - costBefore;
+    emitMethodResult(state, methodResult);
     return methodResult;
   }
 
-  // ─── Save file ───────────────────────────────────────────
   mkdirSync(state.infrastructure!.testDir, { recursive: true });
-  const testFilePath = join(state.infrastructure!.testDir, basename(planToUse.fileName));
+  const testFilePath = join(state.infrastructure!.testDir, basename(plan.fileName));
   writeFileSync(testFilePath, writeResult.code);
   methodResult.testFile = testFilePath;
   methodResult.testCode = writeResult.code;
@@ -279,7 +237,7 @@ export async function processCover(
   log(state, `  File written: ${testFilePath}`);
   state.notes.push({
     phase: "implement",
-    summary: `Written ${testFilePath} for ${method} with ${planToUse.testCases.length + 1} tests.`,
+    summary: `Written ${testFilePath} for ${method} with ${plan.testCases.length + 1} tests.`,
   });
 
   methodResult.cost = state.cost.totalUsd - costBefore;

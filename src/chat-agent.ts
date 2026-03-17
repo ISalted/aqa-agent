@@ -32,9 +32,9 @@ const PIPELINE_TOOL: Anthropic.Tool = {
     properties: {
       action: {
         type: "string",
-        enum: ["cover", "analyze", "plan", "fix", "implement_only", "validate_only"],
+        enum: ["analyze", "plan", "fix", "implement_only", "validate_only"],
         description:
-          "cover = full cycle (plan+write), analyze = coverage only, plan = plans only, fix = repair failures, implement_only = write from saved plans, validate_only = run tests only",
+          "analyze = coverage only, plan = plans only, fix = repair failures, implement_only = write from saved plans, validate_only = run tests only. Omit for full pipeline (plan+write+validate).",
       },
       service: {
         type: "string",
@@ -46,7 +46,7 @@ const PIPELINE_TOOL: Anthropic.Tool = {
         description: "Specific methods to process (optional — omit to process all)",
       },
     },
-    required: ["action", "service"],
+    required: ["service"],
   },
 };
 
@@ -122,7 +122,7 @@ function buildSystemPrompt(skillTradePath: string): string {
     serviceLines || "  (no services found — SKILL_TRADE_PATH may be wrong)",
     "",
     "## Available Actions",
-    "  cover         — full cycle: plan + write tests for uncovered methods",
+    "  (omit)        — full pipeline: plan + write + validate all uncovered methods",
     "  analyze       — coverage report only, no implementation",
     "  plan          — generate test plans only (saves them for implement_only)",
     "  fix           — repair failing tests (run + debug loop)",
@@ -133,7 +133,7 @@ function buildSystemPrompt(skillTradePath: string): string {
     "## Behavior Rules",
     "- Call start_pipeline immediately when the user's intent is clear.",
     "- Use ask_clarification when the service or action is genuinely ambiguous.",
-    "- For compound requests (e.g. 'analyze AND implement') → use action: cover.",
+    "- OMIT action (do not set it) when user wants to write/implement/cover/generate tests — this triggers full pipeline.",
     "- Match service names EXACTLY from the list above.",
     "- Respond in the same language the user writes in.",
     "- Be concise.",
@@ -197,7 +197,7 @@ export async function chatTurn(
       text: extractText(response.content) || `Starting: ${input.action} ${input.service}`,
       thinking,
       intent: {
-        action: input.action as ParsedIntent["action"],
+        action: (input.action ?? null) as ParsedIntent["action"],
         service: input.service,
         methods: input.methods?.length ? input.methods : undefined,
         raw: userMessage,

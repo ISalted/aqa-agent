@@ -2,7 +2,7 @@ import { EventEmitter } from "events";
 import type { RunState } from "./types.js";
 
 export interface PipelineEvent {
-  type: "started" | "log" | "phase" | "method-result" | "complete" | "error" | "aborted";
+  type: "started" | "log" | "phase" | "method-result" | "complete" | "error" | "aborted" | "system-prompt";
   runId: string;
   timestamp: string;
   data: Record<string, unknown>;

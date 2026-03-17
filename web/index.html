@@ -1634,7 +1634,16 @@
         case 'complete': onComplete(ev); break;
         case 'aborted': onAborted(ev); break;
         case 'error': onError(ev); break;
+        case 'system-prompt': onSystemPrompt(ev); break;
       }
+    }
+
+    function onSystemPrompt(ev) {
+      const phase = ev.data.phase;
+      if (!phase) return;
+      if (!phaseData[phase]) phaseData[phase] = { status: 'pending', messages: [] };
+      phaseData[phase].systemPrompt = ev.data.systemPrompt;
+      if (selectedPhase === phase) renderInspector();
     }
 
     function onPhase(ev) {
@@ -1921,12 +1930,31 @@
         }).join('')}</div>`;
       }
 
+      function renderSectionSystemPrompt() {
+        const sp = pd.systemPrompt;
+        if (!sp) return '<div class="empty-state">No system prompt for this phase</div>';
+        return `<pre style="margin:0;padding:10px 12px;font-family:var(--mono);font-size:11px;color:var(--text-2);white-space:pre-wrap;word-break:break-word">${esc(sp)}</pre>`;
+      }
+
+      function renderSectionThinking() {
+        const thinkingMsgs = (pd.messages || []).filter(m => m.isThinking);
+        if (!thinkingMsgs.length) return '<div class="empty-state">No thinking blocks for this phase</div>';
+        return `<div class="inspector-messages">${thinkingMsgs.map((m, i) =>
+          `<details class="thinking-details" open>` +
+          `<summary><span class="thinking-badge">🧠 thinking</span><span style="color:var(--text-3);font-size:11px;margin-left:8px">#${i + 1} · ${m.elapsed}s</span></summary>` +
+          `<pre class="thinking-pre" style="margin:6px 0 0 0;padding:8px 12px;background:var(--bg-1);border-radius:4px;white-space:pre-wrap;word-break:break-word">${esc(m.message)}</pre>` +
+          `</details>`
+        ).join('')}</div>`;
+      }
+
       const sections = [
-        { key: 'messages', label: 'Log',    render: renderSectionMessages },
-        { key: 'notes',    label: 'Notes',  render: renderSectionNotes },
-        { key: 'state',    label: 'State',  render: renderSectionState },
-        { key: 'tools',    label: 'Tools',  render: renderSectionTools },
-        { key: 'output',   label: 'Output', render: renderSectionOutput },
+        { key: 'messages',      label: 'Log',           render: renderSectionMessages },
+        { key: 'system-prompt', label: 'System Prompt', render: renderSectionSystemPrompt },
+        { key: 'thinking',      label: 'Thinking',      render: renderSectionThinking },
+        { key: 'state',         label: 'State',         render: renderSectionState },
+        { key: 'tools',         label: 'Tools',         render: renderSectionTools },
+        { key: 'notes',         label: 'Notes',         render: renderSectionNotes },
+        { key: 'output',        label: 'Output',        render: renderSectionOutput },
       ];
 
       content.innerHTML = sections.map(s => {
@@ -2033,7 +2061,10 @@
       if (state.costBreakdownHtml !== undefined) $('costBreakdown').innerHTML = state.costBreakdownHtml;
       if (state.phaseDataSnapshot) {
         for (const [phase, data] of Object.entries(state.phaseDataSnapshot)) {
-          phaseData[phase] = data;
+          const existing = phaseData[phase];
+          phaseData[phase] = existing
+            ? { ...data, systemPrompt: existing.systemPrompt ?? data.systemPrompt }
+            : data;
         }
       }
       if (state.footerLeft) $('footerLeft').textContent = state.footerLeft;
@@ -2647,7 +2678,8 @@
           const dur = (r.durationMs / 1000).toFixed(0);
           const d = new Date(r.timestamp);
           const hhmm = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-          return `<div class="history-entry"><span class="history-id">${esc(r.runId)}</span><span class="history-service">${esc(r.service)}</span><span class="history-action">${r.action}</span><span class="history-cost">$${r.totalCostUsd.toFixed(4)}</span><span class="history-time">${hhmm} · ${dur}s</span></div>`;
+          const actionLabel = r.action || 'pipeline';
+          return `<div class="history-entry"><span class="history-id">${esc(r.runId)}</span><span class="history-service">${esc(r.service)}</span><span class="history-action">${actionLabel}</span><span class="history-cost">$${r.totalCostUsd.toFixed(4)}</span><span class="history-time">${hhmm} · ${dur}s</span></div>`;
         }).join('');
       } catch { }
     }
