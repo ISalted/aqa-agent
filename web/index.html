@@ -930,7 +930,7 @@
 
     .history-service {
       color: var(--text-2);
-      flex: 1;
+      flex: 0 0 auto;
     }
 
     .history-action {
@@ -939,19 +939,23 @@
       border-radius: 3px;
       background: var(--bg-3);
       color: var(--text-3);
+      width: 90px;
+      flex-shrink: 0;
+      text-align: left;
     }
 
     .history-cost {
       font-family: var(--mono);
       color: var(--text-4);
-      min-width: 56px;
+      width: 64px;
+      flex-shrink: 0;
       text-align: right;
     }
 
     .history-time {
       color: var(--text-4);
-      min-width: 32px;
-      text-align: right;
+      flex: 1;
+      text-align: left;
     }
 
     /* ─── Right sidebar ─── */
@@ -2641,7 +2645,9 @@
         if (!h.length) { $('historyList').innerHTML = '<div class="empty-state">No runs yet</div>'; return; }
         $('historyList').innerHTML = h.slice(0, 20).map(r => {
           const dur = (r.durationMs / 1000).toFixed(0);
-          return `<div class="history-entry"><span class="history-id">${esc(r.runId)}</span><span class="history-service">${esc(r.service)}</span><span class="history-action">${r.action}</span><span class="history-cost">$${r.totalCostUsd.toFixed(4)}</span><span class="history-time">${dur}s</span></div>`;
+          const d = new Date(r.timestamp);
+          const hhmm = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+          return `<div class="history-entry"><span class="history-id">${esc(r.runId)}</span><span class="history-service">${esc(r.service)}</span><span class="history-action">${r.action}</span><span class="history-cost">$${r.totalCostUsd.toFixed(4)}</span><span class="history-time">${hhmm} · ${dur}s</span></div>`;
         }).join('');
       } catch { }
     }

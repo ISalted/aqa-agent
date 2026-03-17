@@ -8,7 +8,7 @@ const ACTION_KEYWORDS: Partial<Record<NonNullable<ParsedIntent["action"]>, RegEx
   analyze:       /аналіз|проаналізу|analyze|coverage|покрит[тя]/i,
   plan:          /^план|^plan|тільки план|plan only|запланій/i,
   fix:           /полагод|fix|виправ|repair|почин|лагод/i,
-  implement_only:/реалізуй тести по плану|тепер реалізуй|тепер імплементуй|імплементуй по плану|implement_only|implement only|збережених планів|use saved plan|from saved plan/i,
+  implement_only:/реалізуй тести по плану|імплементуй по плану|implement_only|use saved plan|from saved plan/i,
   validate_only: /запусти тести|завалідуй|run tests|validate only|заранити тести/i,
 };
 
@@ -89,7 +89,7 @@ export async function parsePromptLLM(
       "Parse the user's request into a JSON object for a QA test automation agent.",
       `Available services: ${services.join(", ")}`,
       "Available actions: null (default, full pipeline: plan+write+validate), analyze (coverage report only), plan (generate test plan only, no implementation), fix (repair failing tests), implement_only (write code from a previously saved plan), validate_only (run existing tests only)",
-      "Action selection rules: return null when user wants to write/create/implement/generate tests — this triggers the full pipeline. Use 'implement_only' ONLY when user explicitly says 'from saved plan', 'use existing plan', or 'implement only'. Use 'plan' ONLY when user says 'only plan' or 'just plan'.",
+      "Action selection rules: return null when user wants to write/create/implement/generate/cover tests — this triggers the full pipeline. CRITICAL: 'implement tests for X', 'write tests for X', 'імплементуй тести', 'напиши тести', 'покрий тестами' all = null. Use 'implement_only' ONLY when user explicitly says 'from saved plan', 'use existing plan', 'по плану', or 'implement only' without specifying a new task. Use 'plan' ONLY when user says 'only plan', 'just plan', 'тільки план'.",
       'Return ONLY valid JSON: {"action":"...","service":"...","methods":null}',
       'If methods are mentioned, return them as an array: {"methods":["MethodName"]}',
       "If you cannot determine the service, return null.",

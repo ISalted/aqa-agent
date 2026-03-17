@@ -1,14 +1,14 @@
 import "dotenv/config";
 import express from "express";
 import { join, basename } from "path";
-import { existsSync, appendFileSync, mkdirSync } from "fs";
+import { existsSync, appendFileSync, mkdirSync, rmSync } from "fs";
 import { globSync } from "glob";
 import Anthropic from "@anthropic-ai/sdk";
 import { pipelineEvents, emitPipelineEvent } from "./events.js";
 import type { PipelineEvent } from "./events.js";
 import { loadRunHistory, loadRunLedger } from "./memory/run-history.js";
 import { getSessionCost, addRunCost, resetSessionCost } from "./memory/session-cost.js";
-import { loadLastPlanRun, loadLastImplementRun } from "./memory/resumable-context.js";
+import { loadLastPlanRun, loadLastImplementRun, clearSessionCache } from "./memory/resumable-context.js";
 import { loadProjectIndex } from "./memory/project-index.js";
 import {
   loadProtoChangeReport,
@@ -32,9 +32,10 @@ function logChat(entry: Record<string, unknown>): void {
   } catch {}
 }
 
-// Reset session cost on each server boot so every UI/server start
-// begins with a fresh accounting window for costs.
+// Reset session state on each server boot.
 resetSessionCost();
+clearSessionCache();
+if (existsSync(CHAT_LOG_PATH)) rmSync(CHAT_LOG_PATH);
 
 const app = express();
 app.use(express.json());

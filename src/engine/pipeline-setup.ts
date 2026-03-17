@@ -52,6 +52,8 @@ export async function runSetupPhases(
     log(state, "Using saved plan context");
     emitPipelineEvent("phase", state.runId, { phase: "understand", status: "complete", stateSnapshot: serializeStateSnapshot(state), tools: [] });
     transition(state, "plan", "restored from saved plan");
+    const planCount = Object.keys(savedPlanContext.plans).length;
+    log(state, `${planCount} saved plan(s) loaded — skipping LLM planning`);
     emitPipelineEvent("phase", state.runId, { phase: "plan", status: "pending" });
     return state;
   }

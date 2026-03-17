@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync } from "fs";
 import { resolve, dirname } from "path";
 import type { TestPlan, MethodResult } from "../types.js";
 
@@ -109,6 +109,13 @@ export interface PlanContext {
   plans: Record<string, TestPlan>;
   protoPath: string;
   testDir: string;
+}
+
+/** Clear session-scoped cache: plans/, last-plan-run.json, last-implement-run.json. */
+export function clearSessionCache(): void {
+  if (existsSync(PLANS_DIR)) rmSync(PLANS_DIR, { recursive: true, force: true });
+  if (existsSync(LAST_PLAN_PATH)) rmSync(LAST_PLAN_PATH);
+  if (existsSync(LAST_IMPLEMENT_PATH)) rmSync(LAST_IMPLEMENT_PATH);
 }
 
 /** Load full plan context (plans + protoPath + testDir) for implement_only to skip resolve. */

@@ -197,7 +197,6 @@ export async function processCover(
     planToUse = savedPlan;
     methodResult.plan = planToUse;
     methodResult.status = "planned";
-    log(state, `[${ctx.methodIndex + 1}/${ctx.totalMethods}] Using saved plan for: ${method}`);
     emitMethodResult(state, methodResult);
   } else {
     // cover: plan first
@@ -240,7 +239,7 @@ export async function processCover(
 
   // ─── Write ───────────────────────────────────────────────
   transition(state, "implement", `plan OK: ${planToUse.testCases.length + 1} test cases for method=${method}`);
-  log(state, `  Writing tests for: ${method}`);
+  log(state, `[${ctx.methodIndex + 1}/${ctx.totalMethods}] Writing: ${method}`);
 
   const writeResult = await writeTests(
     state.contract!,
