@@ -10,7 +10,9 @@
 | `enum` | valid value + unknown/invalid value |
 | `repeated` | empty list + single item + multiple items |
 | `uint32` | typical value + 0 (min boundary) + max (4294967295) |
+| `uint64` | typical value + 0 (min boundary) + max (18446744073709551615) — never use uint32 max here |
 | `int32` | typical value + negative + max (2147483647) + min (-2147483648) |
+| `int64` | typical value + 0 + max (9223372036854775807) + min (-9223372036854775808) |
 | `bool` | both `true` and `false` |
 | `string (ID)` | valid ID + empty string + malformed |
 
@@ -38,12 +40,9 @@ oneof result {
 → never expect both simultaneously
 ```
 
-## ContestEngine Lifecycle
-
-Contest stages: **create → publish → register → start → end**
-
-Note which stage a method requires and plan setup accordingly.
-Always plan for a registered user before any contest operation.
+## Test Count
+- Never add placeholder test cases (e.g. "TBD", "Additional edge case"). If you run out of meaningful cases before reaching 10, stop there.
+- More complex schemas (many fields, multiple oneof, map types) naturally produce more test cases — up to 10 is fine.
 
 ## What to Highlight in save_notes
 

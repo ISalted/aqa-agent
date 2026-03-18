@@ -232,10 +232,10 @@ Return ONLY valid JSON — no markdown fences, no explanations:
 }
 
 ## Rules
-- Always include a schema validation test first (id: PREFIX-001, type: schema, P1)
+- First test case must be type: schema, id: PREFIX-001, priority: P1
 - Minimum: 1 positive + 1 negative test case
-- Use EXACTLY 3 uppercase letters as prefix — never 4+. Take first letter of each CamelCase word left to right. If fewer than 3 words, pad with next letters of the first word: InsertOrReplaceMissionsGroup → IOR, InsertOrReplaceRewardPack → IOR, GetMission → GMI, CreateUser → CRU
-- P1 = critical (must have), P2 = important (should have), P3 = nice to have
+- Use EXACTLY 3 uppercase letters as prefix (see Knowledge Base for derivation rule and examples)
+- Use P1/P2/P3 priorities (see Knowledge Base for definitions)
 - 5-10 test cases total per method
 - Every test name must start with its full ID: "PREFIX-NNN: ..."`;
 }

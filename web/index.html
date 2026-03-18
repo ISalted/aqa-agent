@@ -2384,8 +2384,7 @@
         const note = m.status === 'analyzed' ? '<div class="method-note">Coverage gap found during analysis</div>' : '';
         const planBody = m.plan
           ? (m.plan.fileName ? `<div class="plan-file">${esc(m.plan.fileName)}</div>` : '') +
-            renderPlanCase(m.plan.schemaTest, true, m.testCode) +
-            (m.plan.testCases || []).map(tc => renderPlanCase(tc, false, m.testCode)).join('')
+            (m.plan.testCases || []).map(tc => renderPlanCase(tc, m.testCode)).join('')
           : null;
         if (planBody) {
           return `<details class="method-card${cls}">` +
@@ -2522,9 +2521,9 @@
       return lines.slice(open, end + 1).join('\n');
     }
 
-    function renderPlanCase(testCase, isSchema, testCode) {
+    function renderPlanCase(testCase, testCode) {
       if (!testCase) return '';
-      const type = isSchema ? 'schema' : (testCase.type || 'case');
+      const type = testCase.type || 'case';
       const id = testCase.id ? `<span style="color:var(--text-4);font-size:10px;margin-right:6px">${esc(testCase.id)}</span>` : '';
       const snippet = extractTestSnippet(testCode, testCase);
       const body = snippet
@@ -2559,8 +2558,7 @@
       // plan body — if testCode available, each case shows its code snippet instead of description
       const planBody = m.plan
         ? (m.plan.fileName ? `<div class="plan-file">${esc(m.plan.fileName)}</div>` : '') +
-          renderPlanCase(m.plan.schemaTest, true, m.testCode) +
-          (m.plan.testCases || []).map(tc => renderPlanCase(tc, false, m.testCode)).join('')
+          (m.plan.testCases || []).map(tc => renderPlanCase(tc, m.testCode)).join('')
         : null;
 
       // code body — fallback when no plan
