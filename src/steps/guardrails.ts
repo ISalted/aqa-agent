@@ -15,12 +15,13 @@ export function validatePlan(plan: TestPlan): GuardrailResult {
     errors.push("Plan must specify service and method");
   }
 
-  if (!plan.schemaTest) {
-    errors.push("Plan must include a schema validation test (mandatory per project rules)");
-  }
-
   if (plan.testCases.length === 0) {
     errors.push("Plan must have at least one test case");
+  }
+
+  const schemaTest = plan.testCases[0];
+  if (!schemaTest || schemaTest.type !== "schema") {
+    errors.push("First test case must be type: schema (mandatory per project rules)");
   }
 
   const hasPositive = plan.testCases.some((t) => t.type === "positive");
@@ -28,14 +29,13 @@ export function validatePlan(plan: TestPlan): GuardrailResult {
     errors.push("Plan must include at least one positive (happy path) test");
   }
 
-  const ids = [plan.schemaTest.id, ...plan.testCases.map((t) => t.id)];
+  const ids = plan.testCases.map((t) => t.id);
   if (new Set(ids).size !== ids.length) {
     errors.push("Duplicate test case IDs detected");
   }
 
-  const allCases = [plan.schemaTest, ...plan.testCases];
   const idPattern = /^[A-Z]{3}-\d{3}$/;
-  for (const tc of allCases) {
+  for (const tc of plan.testCases) {
     if (!idPattern.test(tc.id)) {
       errors.push(`Test case ${tc.id || "<missing>"} must match ID format AAA-001`);
     }
@@ -44,18 +44,16 @@ export function validatePlan(plan: TestPlan): GuardrailResult {
     }
   }
 
-  if (!idPattern.test(plan.schemaTest.id)) {
+  if (schemaTest && !idPattern.test(schemaTest.id)) {
     errors.push("Schema test must use ID format AAA-001");
   }
-  if (!/\-001$/.test(plan.schemaTest.id)) {
+  if (schemaTest && !/\-001$/.test(schemaTest.id)) {
     errors.push("Schema test must be the first numbered case and end with -001");
   }
 
   for (const tc of plan.testCases) {
     validateTestCase(tc, errors, warnings);
   }
-
-  validateTestCase(plan.schemaTest, errors, warnings);
 
   if (plan.testCases.length > 20) {
     warnings.push(`Plan has ${plan.testCases.length} test cases — consider splitting`);

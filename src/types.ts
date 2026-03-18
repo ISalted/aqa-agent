@@ -124,8 +124,7 @@ export interface TestPlan {
   service: string;
   method: string;
   fileName: string;
-  schemaTest: TestCase;
-  testCases: TestCase[];
+  testCases: TestCase[]; // first element must be type: "schema"
 }
 
 export interface TestCase {

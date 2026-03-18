@@ -266,8 +266,7 @@ function emitMethodResult(state: RunState, methodResult: MethodResult): void {
       testCode: methodResult.testCode ?? null,
       plan: methodResult.plan ? {
         fileName: methodResult.plan.fileName,
-        totalCases: methodResult.plan.testCases.length + 1,
-        schemaTest: methodResult.plan.schemaTest,
+        totalCases: methodResult.plan.testCases.length,
         testCases: methodResult.plan.testCases,
       } : null,
     },

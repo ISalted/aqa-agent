@@ -225,8 +225,10 @@ Return ONLY valid JSON — no markdown fences, no explanations:
   "service": "string",
   "method": "string",
   "fileName": "string (camelCase like methodName.test.ts)",
-  "schemaTest": { "id": "PREFIX-001", "type": "schema", "priority": "P1", "name": "PREFIX-001: Schema validation for ...", "description": "string", "expectedBehavior": "string" },
-  "testCases": [{ "id": "PREFIX-NNN", "type": "positive|negative|boundary|edge", "priority": "P1|P2|P3", "name": "PREFIX-NNN: ...", "description": "string", "expectedBehavior": "string" }]
+  "testCases": [
+    { "id": "PREFIX-001", "type": "schema", "priority": "P1", "name": "PREFIX-001: Schema validation for ...", "description": "string", "expectedBehavior": "string" },
+    { "id": "PREFIX-NNN", "type": "positive|negative|boundary|edge", "priority": "P1|P2|P3", "name": "PREFIX-NNN: ...", "description": "string", "expectedBehavior": "string" }
+  ]
 }
 
 ## Rules

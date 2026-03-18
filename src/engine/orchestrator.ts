@@ -295,7 +295,7 @@ function serializeMethodResult(mr: MethodResult) {
   return {
     method: mr.method, status: mr.status, cost: mr.cost, attempts: mr.attempts,
     passed: mr.result?.passed ?? 0, failed: mr.result?.failed ?? 0, testFile: mr.testFile,
-    plan: mr.plan ? { fileName: mr.plan.fileName, totalCases: mr.plan.testCases.length + 1, schemaTest: mr.plan.schemaTest, testCases: mr.plan.testCases } : null,
+    plan: mr.plan ? { fileName: mr.plan.fileName, totalCases: mr.plan.testCases.length, testCases: mr.plan.testCases } : null,
   };
 }
 
