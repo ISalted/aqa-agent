@@ -130,10 +130,7 @@ function assembleSystemPrompt(context: AgentContextLocal): string {
   }
 
   if (context.projectRules) {
-    const truncated = context.projectRules.length > 4000
-      ? context.projectRules.slice(0, 4000) + "\n... [truncated]"
-      : context.projectRules;
-    parts.push("\n## Project Rules\n" + truncated);
+    parts.push("\n## Project Rules\n" + context.projectRules);
   }
 
   return parts.join("\n");

@@ -253,7 +253,7 @@ function buildCoderSystemPrompt(): string {
 ## Rules
 - Follow the provided example test EXACTLY for imports, structure, and style
 - Schema validation test MUST use ts-interface-checker (createCheckers)
-- Use generateProcessId() or generateUUID() for unique IDs — NEVER hardcode values
+- Use helpers.generateProcessId() or helpers.generateUUID() for unique IDs — NEVER hardcode values
 - Each test must be self-contained — no shared mutable state between tests
 - Use the exact test case IDs from the plan in every test title
 - Write the COMPLETE file — no partial code, no TODOs, no placeholder comments

@@ -3,33 +3,39 @@
 ## Rules
 
 - NEVER hardcode IDs, emails, timestamps, or environment-specific values
-- Use helpers for ALL dynamic data
+- Use helpers fixture for ALL dynamic data
 - Each test must generate its own unique data
 
 ## Helpers Available
 
 ```typescript
-import { Helpers } from '../../../lib/helpers/helpers';
+// helpers is a Playwright fixture — access it in the test function
+test("example", async ({ gRPC, helpers }) => {
+  const processId = helpers.generateProcessId(); // unique string
+  const uuid = helpers.generateUUID();           // v4 UUID string
+  const currentDate = helpers.getCurrentDate();  // current date
+});
 
-// ProcessId — required for most gRPC calls
-const processId = Helpers.generateProcessId(); // returns unique string
-
-// UUID
-const uuid = Helpers.generateUUID(); // returns v4 UUID string
-
-// Unique string with prefix
+// Unique string with prefix — use when helpers methods aren't sufficient
 const name = `test-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+// Unique email
+function uniqEmail() {
+  return `test${Date.now()}${Math.random().toString(16).slice(2)}@example.com`;
+}
 ```
 
 ## Patterns for Different Field Types
 
 | Proto Type | Generation Strategy |
 |---|---|
-| string (ID) | `Helpers.generateProcessId()` or `Helpers.generateUUID()` |
+| string (ID) | `helpers.generateProcessId()` or `helpers.generateUUID()` |
 | string (name) | `` `test-name-${Date.now()}` `` |
-| string (email) | `` `test-${Date.now()}@test.com` `` |
-| int32/int64 | `Math.floor(Math.random() * 1000)` |
-| uint32/uint64 | `Math.floor(Math.random() * 1000)` |
+| string (email) | `` `test${Date.now()}${Math.random().toString(16).slice(2)}@example.com` `` |
+| int32 | `Math.floor(Math.random() * 1000)` |
+| int64 | `String(Math.floor(Math.random() * 1000))` — pass as string |
+| uint32 | `Math.floor(Math.random() * 1000)` |
+| uint64 | `String(Math.floor(Math.random() * 1000))` — pass as string; for max boundary use `"18446744073709551615"` |
 | float/double | `Math.random() * 100` |
 | bool | `true` / `false` (test both) |
 | enum | Use enum values from proto (test valid and invalid) |
@@ -43,5 +49,6 @@ const name = `test-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 |---|---|---|
 | int32 | -2147483648 | 2147483647 |
 | uint32 | 0 | 4294967295 |
-| int64 | Use BigInt or string | Use BigInt or string |
+| int64 | `"-9223372036854775808"` (as string) | `"9223372036854775807"` (as string) |
+| uint64 | `"0"` or `0n` (BigInt) | `"18446744073709551615"` (as string) — NEVER use `Number.MAX_SAFE_INTEGER` |
 | string | `""` (empty) | Very long string (1000+ chars) |
