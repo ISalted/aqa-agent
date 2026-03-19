@@ -8,6 +8,7 @@ import {
   loadLastPlanRun,
   loadLastImplementRun,
 } from "./memory/resumable-context.js";
+import { parseSuiteIdFromUrl, slugToPascalCase } from "./intent-parser.js";
 import type { ParsedIntent } from "./types.js";
 
 const client = new Anthropic();
@@ -44,6 +45,11 @@ const PIPELINE_TOOL: Anthropic.Tool = {
         type: "array",
         items: { type: "string" },
         description: "Specific methods to process (optional — omit to process all)",
+      },
+      testomatio_suite_url: {
+        type: "string",
+        description:
+          "Full Testomatio suite URL if the user provided one (e.g. https://app.testomat.io/projects/.../suite/abc123-cancel-contest). Pass it as-is.",
       },
     },
     required: ["service"],
@@ -137,6 +143,7 @@ function buildSystemPrompt(skillTradePath: string): string {
     "- Match service names EXACTLY from the list above.",
     "- Respond in the same language the user writes in.",
     "- Be concise.",
+    "- If the user provides a Testomatio URL (testomat.io/projects/.../suite/...): pass it as testomatio_suite_url, infer the service from the slug (e.g. 'cancel-contest' → ContestEngine), and infer the method from the slug in PascalCase (e.g. 'cancel-contest' → CancelContest). Do NOT ask clarifying questions when a URL is provided.",
   ].join("\n");
 }
 
@@ -188,19 +195,37 @@ export async function chatTurn(
   );
   if (pipelineTool) {
     const input = pipelineTool.input as {
-      action: string;
+      action?: string;
       service: string;
       methods?: string[];
+      testomatio_suite_url?: string;
     };
+
+    // Extract suite ID and method from URL if provided
+    const suiteUrl = input.testomatio_suite_url ?? parseSuiteIdFromUrl(userMessage) ? userMessage : undefined;
+    const suiteId = input.testomatio_suite_url
+      ? parseSuiteIdFromUrl(input.testomatio_suite_url)
+      : parseSuiteIdFromUrl(userMessage);
+
+    // If URL provided and no explicit methods, infer method from slug
+    let methods = input.methods?.length ? input.methods : undefined;
+    if (!methods && suiteUrl) {
+      const slugMatch = suiteUrl.match(/suite\/[a-f0-9]{8}-([a-z0-9-]+)/i);
+      if (slugMatch) {
+        methods = [slugToPascalCase(slugMatch[1])];
+      }
+    }
+
     return {
       type: "pipeline",
-      text: extractText(response.content) || `Starting: ${input.action} ${input.service}`,
+      text: extractText(response.content) || `Starting: ${input.action ?? "full pipeline"} ${input.service}`,
       thinking,
       intent: {
         action: (input.action ?? null) as ParsedIntent["action"],
         service: input.service,
-        methods: input.methods?.length ? input.methods : undefined,
+        methods,
         raw: userMessage,
+        testomatioSuiteId: suiteId ?? undefined,
       },
       _rawContent: response.content,
       _toolUseId: pipelineTool.id,

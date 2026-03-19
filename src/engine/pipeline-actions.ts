@@ -6,7 +6,7 @@ import { runTests } from "../steps/run-tests.js";
 import { debugTests } from "../steps/debug-tests.js";
 import { emitPipelineEvent, serializeStateSnapshot } from "../events.js";
 import { transition } from "./state-machine.js";
-import type { RunState, MethodResult, TestPlan, LedgerAttempt } from "../types.js";
+import type { RunState, MethodResult, TestPlan, LedgerAttempt, ManualTestCase } from "../types.js";
 
 const MAX_DEBUG_RETRIES = 2;
 
@@ -146,6 +146,11 @@ export async function processPlan(
   transition(state, "plan", `processPlan for method=${method} (${ctx.methodIndex + 1}/${ctx.totalMethods})`);
   log(state, `[${ctx.methodIndex + 1}/${ctx.totalMethods}] Planning: ${method}`);
 
+  const manualTestCases: ManualTestCase[] = state.understandContext?.manualTestCases ?? [];
+  if (manualTestCases.length > 0) {
+    log(state, `  Testomatio: ${manualTestCases.length} manual test cases from suite`);
+  }
+
   const planResult = await planTests(
     state.contract!,
     state.coverage!,
@@ -153,6 +158,7 @@ export async function processPlan(
     ctx.skillTradePath,
     state.cost,
     state.notes,
+    manualTestCases,
   );
 
   if (planResult.systemPrompt) {

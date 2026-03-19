@@ -15,7 +15,8 @@ import type {
   ProtoChangeServiceReport,
   UnderstandContext,
 } from "../types.js";
-import { getServiceCoverage, type ServiceCoverage } from "../testomatio/client.js";
+import { getServiceCoverage, getTestsWithDetails, type ServiceCoverage } from "../testomatio/client.js";
+import type { ManualTestCase } from "../types.js";
 import { loadProtoChangeReport } from "../memory/proto-changes.js";
 import { resolveService } from "../steps/resolve-service.js";
 import { parseContract } from "../steps/parse-contract.js";
@@ -167,12 +168,26 @@ export async function understand(
     (protoChanges.addedMethods.length > 0 || protoChanges.changedMethods.length > 0);
   const scope: UnderstandContext["scope"] = hasChanges ? "changed_only" : "all_methods";
 
-  // 3. Testomatio (best-effort)
+  // 3. Testomatio coverage + manual test cases (best-effort)
   let testomatioCoverage: ServiceCoverage | null = null;
-  try {
-    testomatioCoverage = await getServiceCoverage(entry.testomatio);
-  } catch {
-    testomatioCoverage = null;
+  let manualTestCases: ManualTestCase[] = [];
+
+  if (intent.testomatioSuiteId) {
+    // User provided a specific suite URL → fetch tests with full descriptions
+    const rawTests = await getTestsWithDetails(intent.testomatioSuiteId);
+    manualTestCases = rawTests.map((t) => ({
+      id: t.id,
+      title: t.title,
+      description: t.description ?? undefined,
+      tags: t.tags,
+    }));
+  } else {
+    // Fallback: fetch coverage stats from service map
+    try {
+      testomatioCoverage = await getServiceCoverage(entry.testomatio);
+    } catch {
+      testomatioCoverage = null;
+    }
   }
 
   // 4. Local test files count
@@ -200,6 +215,7 @@ export async function understand(
     protoChanges,
     scope,
     localTestFilesCount,
+    manualTestCases,
     infrastructure,
     contract,
     coverage,

@@ -191,6 +191,8 @@ export interface UnderstandContext {
   protoChanges: ProtoChangeServiceReport | null;
   scope: "changed_only" | "all_methods";
   localTestFilesCount: number;
+  // Manual test cases fetched from Testomatio (when suite URL provided)
+  manualTestCases: ManualTestCase[];
   // Absorbed from resolve/parse/coverage phases
   infrastructure: ServiceInfrastructure;
   contract: NormalizedContract;
@@ -265,6 +267,14 @@ export interface ParsedIntent {
   service: string;
   methods?: string[];
   raw: string;
+  testomatioSuiteId?: string; // suite ID extracted from Testomatio URL
+}
+
+export interface ManualTestCase {
+  id: string;
+  title: string;
+  description?: string; // full Testomatio description (Preconditions + Steps + Expected)
+  tags?: string[];
 }
 
 // ─── Cost Tracking ──────────────────────────────────────────

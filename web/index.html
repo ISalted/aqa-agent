@@ -2509,14 +2509,14 @@
       let open = startIdx;
       while (open > 0 && !lines[open].match(/^\s*(test|it)\s*\(/)) open--;
       // walk forward counting braces to find the closing
-      let depth = 0, end = open;
+      let depth = 0, end = open, enteredBlock = false;
       for (let i = open; i < lines.length; i++) {
         for (const ch of lines[i]) {
-          if (ch === '{') depth++;
+          if (ch === '{') { depth++; enteredBlock = true; }
           else if (ch === '}') depth--;
         }
         end = i;
-        if (depth === 0 && i > open) break;
+        if (enteredBlock && depth === 0) break;
       }
       return lines.slice(open, end + 1).join('\n');
     }
@@ -2529,8 +2529,8 @@
       const body = snippet
         ? `<pre class="test-code-pre" style="margin:0"><code class="hljs language-typescript">${hlts(snippet)}</code></pre>`
         : [
-            testCase.description ? `<div style="margin-bottom:4px">${esc(testCase.description)}</div>` : '',
-            testCase.expectedBehavior ? `<div style="color:var(--text-3);font-size:10.5px">Expected: ${esc(testCase.expectedBehavior)}</div>` : '',
+            testCase.description ? `<pre style="margin:0 0 4px 0;white-space:pre-wrap;word-break:break-word;font-family:var(--sans);font-size:11.5px;line-height:1.5">${esc(testCase.description)}</pre>` : '',
+            testCase.expectedBehavior ? `<div style="color:var(--text-3);font-size:10.5px;white-space:pre-wrap">Expected: ${esc(testCase.expectedBehavior)}</div>` : '',
           ].filter(Boolean).join('');
       return `<details class="plan-case">` +
         `<summary><span class="plan-case-title">${id}${esc(testCase.name || 'Unnamed case')}</span>` +

@@ -6,9 +6,11 @@ import type {
   NormalizedContract,
   CoverageReport,
   TestPlan,
+  TestCase,
   CostAccumulator,
   GuardrailResult,
   StepNote,
+  ManualTestCase,
 } from "../types.js";
 
 export interface PlanTestsResult {
@@ -22,8 +24,11 @@ export interface PlanTestsResult {
 }
 
 /**
- * LLM step: generates a test plan for a single RPC method.
- * Uses Haiku by default (cheap, structured output).
+ * Plan tests for a single RPC method.
+ *
+ * Two paths:
+ *   1. testomatioTests provided → deterministic mapping, zero LLM tokens
+ *   2. No testomatio tests → LLM generates the plan
  */
 export async function planTests(
   contract: NormalizedContract,
@@ -32,10 +37,21 @@ export async function planTests(
   skillTradePath: string,
   costAccumulator: CostAccumulator,
   notes: StepNote[] = [],
+  testomatioTests: ManualTestCase[] = [],
 ): Promise<PlanTestsResult> {
+
+  // ─── Path 1: Testomatio-sourced plan (no LLM) ──────────────
+  if (testomatioTests.length > 0) {
+    const plan = buildPlanFromTestomatio(contract, method, testomatioTests);
+    return {
+      plan,
+      guardrailResult: { valid: true, errors: [], warnings: [] },
+    };
+  }
+
+  // ─── Path 2: LLM-generated plan ────────────────────────────
   const model = getModelForAgent("planner");
   const context = buildPlannerContext(contract, coverage, method, skillTradePath);
-
   const userMessage = formatNotes(notes) + buildPlannerPrompt(contract, coverage, method, context);
 
   const result = await agenticLoop({
@@ -66,8 +82,100 @@ export async function planTests(
   }
 
   const guardrailResult = validatePlan(plan);
-  return { plan, guardrailResult, thinking: result.thinking, savedNotes: result.savedNotes, phaseSummary: result.phaseSummary, systemPrompt: assembleSystemPrompt(context) };
+  return {
+    plan,
+    guardrailResult,
+    thinking: result.thinking,
+    savedNotes: result.savedNotes,
+    phaseSummary: result.phaseSummary,
+    systemPrompt: assembleSystemPrompt(context),
+  };
 }
+
+// ─── Testomatio → TestPlan (deterministic) ───────────────────
+
+function buildPlanFromTestomatio(
+  contract: NormalizedContract,
+  method: string,
+  tests: ManualTestCase[],
+): TestPlan {
+  const serviceName = contract.intentName ?? contract.service;
+  const prefix = methodToPrefix(method);
+  const fileName = `${method.charAt(0).toLowerCase()}${method.slice(1)}.test.ts`;
+
+  // Schema test is always first — required by the implementer
+  const schemaTest: TestCase = {
+    id: `${prefix}-001`,
+    type: "schema",
+    priority: "P1",
+    name: `${prefix}-001: Schema validation for ${method} response structure`,
+    description: `Verify the ${method} response matches the expected proto schema`,
+    expectedBehavior: "Response matches proto schema with all required fields",
+  };
+
+  const testCases: TestCase[] = [schemaTest];
+
+  tests.forEach((t, i) => {
+    const id = `${prefix}-${String(i + 2).padStart(3, "0")}`;
+    const cleanTitle = t.title.replace(/@[\w-]+/g, "").trim();
+    const expectedBehavior = extractExpected(t.description);
+
+    testCases.push({
+      id,
+      type: inferType(t.tags ?? []),
+      priority: inferPriority(t.tags ?? []),
+      name: `${id}: ${cleanTitle}`,
+      description: t.description ?? cleanTitle,
+      expectedBehavior: expectedBehavior || cleanTitle,
+    });
+  });
+
+  return { service: serviceName, method, fileName, testCases };
+}
+
+/**
+ * Convert PascalCase method name to 3-letter uppercase prefix.
+ * CancelContest → CAN, CreateContest → CCO, RegisterToContest → RTC
+ */
+function methodToPrefix(method: string): string {
+  const words = method.match(/[A-Z][a-z]*/g) ?? [method.slice(0, 3).toUpperCase()];
+  if (words.length === 1) return words[0].slice(0, 3).toUpperCase();
+  if (words.length === 2) return (words[0].slice(0, 2) + words[1].slice(0, 1)).toUpperCase();
+  return words.map((w) => w[0]).join("").slice(0, 3).toUpperCase();
+}
+
+function inferType(tags: string[]): TestCase["type"] {
+  const lower = tags.map((t) => t.toLowerCase());
+  if (lower.some((t) => t === "happy-path" || t === "positive")) return "positive";
+  if (lower.some((t) => t === "negative")) return "negative";
+  if (lower.some((t) => t === "edge-case" || t === "edge")) return "edge";
+  if (lower.some((t) => t === "boundary")) return "boundary";
+  return "positive";
+}
+
+function inferPriority(tags: string[]): TestCase["priority"] {
+  const lower = tags.map((t) => t.toLowerCase());
+  if (lower.some((t) => t === "smoke" || t === "critical")) return "P1";
+  if (lower.some((t) => t === "low")) return "P3";
+  return "P2";
+}
+
+/**
+ * Extract the "Expected result:" section from a Testomatio description.
+ */
+function extractExpected(description?: string): string {
+  if (!description) return "";
+  const lines = description.split("\n");
+  const idx = lines.findIndex((l) => /expected result:/i.test(l));
+  if (idx === -1) return "";
+  return lines
+    .slice(idx)
+    .join("\n")
+    .replace(/^expected result:\s*/i, "")
+    .trim();
+}
+
+// ─── LLM path helpers ────────────────────────────────────────
 
 function buildPlannerPrompt(
   contract: NormalizedContract,
@@ -79,8 +187,6 @@ function buildPlannerPrompt(
   const inputMsg = contract.messages.find((m) => m.name === methodDef?.inputType);
   const outputMsg = contract.messages.find((m) => m.name === methodDef?.outputType);
 
-  // Use intentName (from proto filename) for naming — it's the canonical identifier,
-  // resilient to typos in proto's service declaration (e.g. ContestEngine vs MissionEngine).
   const serviceName = contract.intentName ?? contract.service;
   return `Create a test plan for method "${method}" of service "${serviceName}".
 
@@ -113,15 +219,12 @@ Output ONLY the JSON test plan. No markdown, no explanations.`;
 
 function assembleSystemPrompt(context: AgentContextLocal): string {
   const parts = [context.systemPrompt];
-
   if (context.skills.length > 0) {
     parts.push("\n## Knowledge Base\n" + context.skills.join("\n---\n"));
   }
-
   if (context.projectRules) {
     parts.push("\n## Project Rules\n" + context.projectRules);
   }
-
   return parts.join("\n");
 }
 
