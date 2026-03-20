@@ -17,7 +17,6 @@ An AI-powered pipeline that takes QA test cases, service contracts, and codebase
 - `@faker-js`
 
 ---
-
 ## Core Principles
 
 ### Raw Context, No Preprocessing
@@ -1082,26 +1081,26 @@ execution_plan:
 ```typescript
 async function runPipeline(runId: string, mode: "fresh" | "update") {
   const context = await loadContextBundle(runId);
-  
-  const states = mode === "fresh" 
+
+  const states = mode === "fresh"
     ? [state1, phase2a, phase2b, phase2c, state3, state4]
     : [stateU1, stateU2, stateU3];
-  
+
   let accumulated = {};
-  
+
   for (const state of states) {
     ws.emit("state_started", { runId, state: state.name });
-    
+
     // Load prompt from DB (active version)
     const prompt = await loadPrompt(state.promptKey);
-    
+
     const result = await executeState(state, prompt, context, accumulated);
     accumulated[state.name] = result;
-    
+
     await saveStateOutput(runId, state.name, result);
     ws.emit("state_completed", { runId, state: state.name, output: result });
   }
-  
+
   ws.emit("run_completed", { runId, plan: accumulated.execution_plan });
 }
 ```
@@ -1113,13 +1112,13 @@ When the Claude API returns a `tool_use` block for a sub-agent tool:
 ```typescript
 async function handleToolCall(runId: string, stateName: string, toolCall: ToolUse) {
   const tool = tools[toolCall.name];
-  
+
   // Load sub-agent prompt from DB
   const subPrompt = await loadPrompt(tool.promptKey);
-  
+
   // Build sub-agent context (e.g., read files for ask_context)
   const subContext = await buildSubAgentContext(toolCall.input);
-  
+
   // Call Haiku
   const response = await anthropic.messages.create({
     model: tool.subagent_model,
@@ -1127,18 +1126,18 @@ async function handleToolCall(runId: string, stateName: string, toolCall: ToolUs
     system: subPrompt,
     messages: [{ role: "user", content: subContext }]
   });
-  
+
   const result = extractText(response);
-  
+
   // Log everything
   await saveToolCall(runId, stateName, toolCall, result);
-  ws.emit("tool_call", { 
-    runId, stateName, 
-    tool: toolCall.name, 
-    input: toolCall.input, 
-    output: result 
+  ws.emit("tool_call", {
+    runId, stateName,
+    tool: toolCall.name,
+    input: toolCall.input,
+    output: result
   });
-  
+
   return result;
 }
 ```
@@ -1178,7 +1177,7 @@ CREATE TABLE state_prompts (
   version INTEGER NOT NULL DEFAULT 1,
   is_active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMP DEFAULT now(),
-  
+
   UNIQUE(state_key, version)
 );
 ```
