@@ -136,6 +136,38 @@ export interface TestCase {
   expectedBehavior: string;
 }
 
+// ─── Implementation Context ─────────────────────────────────
+
+export interface ImplementationContext {
+  // Infrastructure status
+  serviceWrapperExists: boolean;
+  serviceWrapperPath: string | null;
+  typesExist: boolean;
+  fixtureConnected: boolean;
+  availableFixtures: string[]; // ["gRPC", "noSQL", "db", "helpers"]
+  missingComponents: string[]; // what Plan found missing
+
+  // Current noSQL/DB settings relevant to this service (table names and schema)
+  relevantSettings: RelevantSetting[];
+
+  // Method info for implementer
+  methodSignature: {
+    name: string;
+    inputType: string;
+    outputType: string;
+  } | null;
+
+  // Test file target
+  testFile: string;
+}
+
+export interface RelevantSetting {
+  tableName: string;   // e.g. "contestSettings"
+  tableFile: string;   // absolute path to .table.ts file
+  description: string; // what this table contains (extracted from code)
+  accessPattern: string; // e.g. "noSQL.contestSettings.get()"
+}
+
 // ─── Test Results ───────────────────────────────────────────
 
 export interface TestResult {
@@ -252,6 +284,7 @@ export interface MethodResult {
     | "failed"
     | "skipped";
   testCode?: string;
+  implementationContext?: ImplementationContext;
 }
 
 export interface ParsedIntent {

@@ -10,6 +10,7 @@ import type {
   CostAccumulator,
   GuardrailResult,
   StepNote,
+  ImplementationContext,
 } from "../types.js";
 import { TOOLS_FOR_AGENT } from "../tools/index.js";
 
@@ -36,9 +37,10 @@ export async function writeTests(
   costAccumulator: CostAccumulator,
   testDir: string,
   notes: StepNote[] = [],
+  implementationContext?: ImplementationContext,
 ): Promise<WriteTestsResult> {
   const model = getModelForAgent("coder");
-  const context = buildCoderContext(contract, coverage, plan.method, skillTradePath);
+  const context = buildCoderContext(contract, coverage, plan.method, skillTradePath, undefined, implementationContext);
   const userMessage = formatNotes(notes) + buildCoderPrompt(plan, context, skillTradePath, testDir);
 
   const result = await agenticLoop({

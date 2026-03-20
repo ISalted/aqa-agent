@@ -138,7 +138,7 @@ export async function runPipeline(
         default: { // null = full pipeline: plan → implement
           const planResult = await processPlan(state, method, ctx);
           if (planResult.plan) {
-            const implResult = await processImplement(state, method, ctx, planResult.plan);
+            const implResult = await processImplement(state, method, ctx, planResult.plan, planResult.implementationContext);
             implResult.cost += planResult.cost;
             methodResult = implResult;
           } else {

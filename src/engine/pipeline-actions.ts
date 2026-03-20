@@ -1,12 +1,13 @@
 import { writeFileSync, mkdirSync } from "fs";
 import { join, basename } from "path";
 import { planTests } from "../steps/plan-tests.js";
+import { analyzeImplementationContext } from "../steps/plan-infra.js";
 import { writeTests } from "../steps/write-tests.js";
 import { runTests } from "../steps/run-tests.js";
 import { debugTests } from "../steps/debug-tests.js";
 import { emitPipelineEvent, serializeStateSnapshot } from "../events.js";
 import { transition } from "./state-machine.js";
-import type { RunState, MethodResult, TestPlan, LedgerAttempt } from "../types.js";
+import type { RunState, MethodResult, TestPlan, LedgerAttempt, ImplementationContext } from "../types.js";
 
 const MAX_DEBUG_RETRIES = 2;
 
@@ -166,6 +167,27 @@ export async function processPlan(
     methodResult.plan = planResult.plan;
     methodResult.status = "planned";
     log(state, `  Plan OK: ${planResult.plan.testCases.length + 1} test cases`);
+
+    // Build implementation context
+    const implCtx = analyzeImplementationContext(
+      state.contract!,
+      state.infrastructure!,
+      ctx.skillTradePath,
+      method,
+    );
+    methodResult.implementationContext = implCtx;
+
+    // Log infrastructure status
+    if (implCtx.missingComponents.length > 0) {
+      log(state, `  Missing: ${implCtx.missingComponents.join(", ")}`);
+    }
+    if (implCtx.relevantSettings.length > 0) {
+      log(state, `  Settings: ${implCtx.relevantSettings.map(s => s.accessPattern).join(", ")}`);
+    }
+    if (implCtx.availableFixtures.length > 0) {
+      log(state, `  Fixtures: ${implCtx.availableFixtures.join(", ")}`);
+    }
+
     // Agent-written notes take priority — fall back to structural summary only if agent wrote nothing
     if (planResult.savedNotes?.length) {
       planResult.savedNotes.forEach((n) => state.notes.push({ phase: "plan", summary: n }));
@@ -189,6 +211,7 @@ export async function processImplement(
   method: string,
   ctx: MethodContext,
   plan: TestPlan,
+  implementationContext?: ImplementationContext,
 ): Promise<MethodResult> {
   const methodResult = createMethodResult(method);
   methodResult.plan = plan;
@@ -205,6 +228,7 @@ export async function processImplement(
     state.cost,
     state.infrastructure!.testDir,
     state.notes,
+    implementationContext,
   );
 
   if (writeResult.systemPrompt) {
