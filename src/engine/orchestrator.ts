@@ -71,6 +71,13 @@ export async function runPipeline(
     // ─── Setup: resolve → parse → coverage ───────────────────
     await runSetupPhases(state, skillTradePath, ledgerFacts, signal);
 
+    // ─── Understand only: fetch proto + testomatio, stop ─────
+    if (intent.action === "understand_only") {
+      transition(state, "done", "action=understand_only: no plan/implement requested");
+      log(state, "Understand complete (no plan/implement requested)");
+      return;
+    }
+
     // ─── Analyze: no implementation, just report ──────────────
     if (intent.action === "analyze") {
       state.methodResults = state.coverage!.uncoveredMethods.map((method) => ({
@@ -138,7 +145,7 @@ export async function runPipeline(
         default: { // null = full pipeline: plan → implement
           const planResult = await processPlan(state, method, ctx);
           if (planResult.plan) {
-            const implResult = await processImplement(state, method, ctx, planResult.plan);
+            const implResult = await processImplement(state, method, ctx, planResult.plan, planResult.implementationContext);
             implResult.cost += planResult.cost;
             methodResult = implResult;
           } else {

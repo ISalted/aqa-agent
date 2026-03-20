@@ -120,11 +120,20 @@ export type InfraComponent =
 
 // ─── Test Plan ──────────────────────────────────────────────
 
+export type PlanMode = "new" | "delta" | "noop";
+
 export interface TestPlan {
   service: string;
   method: string;
   fileName: string;
   testCases: TestCase[]; // first element must be type: "schema"
+  mode?: PlanMode;
+  deltaInfo?: {
+    added: string[];    // IDs to add
+    changed: string[];  // IDs to update
+    removed: string[];  // IDs removed from Testomatio (warn only)
+    existing: string[]; // IDs already in file, unchanged
+  };
 }
 
 export interface TestCase {
@@ -134,6 +143,38 @@ export interface TestCase {
   name: string;
   description: string;
   expectedBehavior: string;
+}
+
+// ─── Implementation Context ─────────────────────────────────
+
+export interface ImplementationContext {
+  // Infrastructure status
+  serviceWrapperExists: boolean;
+  serviceWrapperPath: string | null;
+  typesExist: boolean;
+  fixtureConnected: boolean;
+  availableFixtures: string[]; // ["gRPC", "noSQL", "db", "helpers"]
+  missingComponents: string[]; // what Plan found missing
+
+  // Current noSQL/DB settings relevant to this service (table names and schema)
+  relevantSettings: RelevantSetting[];
+
+  // Method info for implementer
+  methodSignature: {
+    name: string;
+    inputType: string;
+    outputType: string;
+  } | null;
+
+  // Test file target
+  testFile: string;
+}
+
+export interface RelevantSetting {
+  tableName: string;   // e.g. "contestSettings"
+  tableFile: string;   // absolute path to .table.ts file
+  description: string; // what this table contains (extracted from code)
+  accessPattern: string; // e.g. "noSQL.contestSettings.get()"
 }
 
 // ─── Test Results ───────────────────────────────────────────
@@ -254,6 +295,7 @@ export interface MethodResult {
     | "failed"
     | "skipped";
   testCode?: string;
+  implementationContext?: ImplementationContext;
 }
 
 export interface ParsedIntent {
@@ -261,6 +303,7 @@ export interface ParsedIntent {
     | null           // default: full pipeline (understand → plan → implement → validate → debug)
     | "fix"
     | "analyze"
+    | "understand_only"
     | "plan"
     | "implement_only"
     | "validate_only";

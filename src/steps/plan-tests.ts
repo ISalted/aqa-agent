@@ -11,6 +11,7 @@ import type {
   GuardrailResult,
   StepNote,
   ManualTestCase,
+  PlanMode,
 } from "../types.js";
 
 export interface PlanTestsResult {
@@ -38,11 +39,12 @@ export async function planTests(
   costAccumulator: CostAccumulator,
   notes: StepNote[] = [],
   testomatioTests: ManualTestCase[] = [],
+  existingFileContent?: string,
 ): Promise<PlanTestsResult> {
 
   // ─── Path 1: Testomatio-sourced plan (no LLM) ──────────────
   if (testomatioTests.length > 0) {
-    const plan = buildPlanFromTestomatio(contract, method, testomatioTests);
+    const plan = buildPlanFromTestomatio(contract, method, testomatioTests, existingFileContent);
     return {
       plan,
       guardrailResult: { valid: true, errors: [], warnings: [] },
@@ -98,6 +100,7 @@ function buildPlanFromTestomatio(
   contract: NormalizedContract,
   method: string,
   tests: ManualTestCase[],
+  existingFileContent?: string,
 ): TestPlan {
   const serviceName = contract.intentName ?? contract.service;
   const prefix = methodToPrefix(method);
@@ -130,7 +133,49 @@ function buildPlanFromTestomatio(
     });
   });
 
-  return { service: serviceName, method, fileName, testCases };
+  // ── Delta analysis ────────────────────────────────────────
+  const allNewIds = testCases.map((tc) => tc.id);
+
+  if (!existingFileContent) {
+    return { service: serviceName, method, fileName, testCases, mode: "new", deltaInfo: { added: allNewIds, changed: [], removed: [], existing: [] } };
+  }
+
+  const existingIds = extractTestIds(existingFileContent);
+  const added = allNewIds.filter((id) => !existingIds.includes(id));
+  const existing = allNewIds.filter((id) => existingIds.includes(id));
+  const removed = existingIds.filter((id) => !allNewIds.includes(id));
+
+  // Check if descriptions changed for existing IDs
+  const changed = existing.filter((id) => {
+    const tc = testCases.find((t) => t.id === id);
+    if (!tc) return false;
+    const existingSnippet = extractSnippetForId(existingFileContent, id);
+    if (!existingSnippet) return false;
+    // Simple heuristic: check if expectedBehavior text appears in existing file
+    return !existingFileContent.includes(tc.expectedBehavior.slice(0, 40));
+  });
+
+  const mode: PlanMode = added.length === 0 && changed.length === 0 && removed.length === 0
+    ? "noop"
+    : "delta";
+
+  // For noop — return empty testCases so coder skips
+  if (mode === "noop") {
+    return { service: serviceName, method, fileName, testCases: [], mode, deltaInfo: { added: [], changed: [], removed: [], existing } };
+  }
+
+  return { service: serviceName, method, fileName, testCases, mode, deltaInfo: { added, changed, removed, existing } };
+}
+
+function extractTestIds(fileContent: string): string[] {
+  const matches = fileContent.match(/["'`]([A-Z]{2,4}-\d{3}):/g) ?? [];
+  return matches.map((m) => m.replace(/["'`]/, "").split(":")[0]);
+}
+
+function extractSnippetForId(fileContent: string, id: string): string | null {
+  const idx = fileContent.indexOf(id);
+  if (idx === -1) return null;
+  return fileContent.slice(idx, idx + 200);
 }
 
 /**

@@ -57,6 +57,14 @@ export function serializeStateSnapshot(state: RunState): Record<string, unknown>
         changed: ctx.protoChanges.changedMethods,
         removed: ctx.protoChanges.removedMethods,
       } : null,
+      manualTestCases: ctx.manualTestCases?.length
+        ? ctx.manualTestCases.map(t => ({
+            id: t.id,
+            title: t.title,
+            description: t.description ?? null,
+            tags: t.tags ?? [],
+          }))
+        : null,
     } : null,
     contractMethods: state.contract?.methods.map(m => ({
       name: m.name,

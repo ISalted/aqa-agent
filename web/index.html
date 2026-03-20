@@ -35,8 +35,19 @@
       --error-dim: rgba(239, 68, 68, 0.12);
       --warning: #f59e0b;
       --warning-dim: rgba(245, 158, 11, 0.12);
-      --mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
-      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --mono: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', 'SF Mono', 'Consolas', monospace;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI Variable', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      /* ── Type scale (VS Code / Warp inspired) ── */
+      --fs-xs:   10px;   /* tags, tiny meta           */
+      --fs-sm:   11px;   /* secondary labels, mono    */
+      --fs-base: 12px;   /* primary UI text           */
+      --fs-md:   13px;   /* section headers, accords  */
+      --fs-lg:   15px;   /* prominent titles          */
+      --fs-xl:   20px;   /* metrics / cost label      */
+      --fs-2xl:  32px;   /* big cost number           */
+      --lh-tight: 1.3;
+      --lh-base:  1.5;
+      --lh-loose: 1.7;
       --chat-width: 520px;
       --right-width: 280px;
       --history-height: 180px;
@@ -46,7 +57,8 @@
       background: var(--bg-0);
       color: var(--text-2);
       font-family: var(--sans);
-      font-size: 14px;
+      font-size: var(--fs-base);
+      line-height: var(--lh-base);
       height: 100vh;
       display: flex;
       flex-direction: column;
@@ -756,7 +768,7 @@
       overflow-y: auto;
       padding: 4px 14px;
       font-family: var(--mono);
-      font-size: 11.5px;
+      font-size: var(--fs-base);
       line-height: 1.7;
     }
 
@@ -1095,6 +1107,53 @@
       color: var(--accent);
     }
 
+    .understand-sources {
+      padding: 4px 14px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .source-section {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      margin-left: 8px;
+    }
+    .source-section-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      padding: 8px 12px;
+      background: var(--bg-2);
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+    }
+    .source-section-header::-webkit-details-marker { display: none; }
+    .source-section-icon {
+      font-size: 9px;
+      color: var(--text-4);
+      transition: transform .15s, color .15s;
+      width: 12px;
+      text-align: center;
+    }
+    .source-section[open] .source-section-icon {
+      transform: rotate(90deg);
+      color: var(--accent);
+    }
+    .source-section-title {
+      font-size: var(--fs-base);
+      font-weight: 600;
+      color: var(--text-2);
+      letter-spacing: -0.01em;
+    }
+    .source-section-meta {
+      margin-left: auto;
+      font-size: var(--fs-xs);
+      color: var(--text-4);
+    }
+
     .method-card.analyzed {
       border-color: rgba(6, 182, 212, .3);
     }
@@ -1122,7 +1181,7 @@
 
     .method-name {
       flex: 1;
-      font-size: 11.5px;
+      font-size: var(--fs-base);
       font-family: var(--mono);
       color: var(--text-1);
     }
@@ -1134,7 +1193,7 @@
     }
 
     .method-meta {
-      font-size: 10px;
+      font-size: var(--fs-xs);
       color: var(--text-4);
       font-family: var(--mono);
       text-align: right;
@@ -1192,7 +1251,7 @@
 
     .plan-case-title {
       color: var(--text-2);
-      font-size: 11.5px;
+      font-size: var(--fs-base);
     }
 
     .plan-case-meta {
@@ -1215,7 +1274,7 @@
       border-radius: 4px;
       padding: 10px 14px;
       font-family: var(--mono);
-      font-size: 10.5px;
+      font-size: var(--fs-sm);
       overflow-x: auto;
       line-height: 1.6;
       white-space: pre;
@@ -1287,9 +1346,10 @@
       padding: 7px 14px;
       cursor: pointer;
       user-select: none;
-      font-size: 11px;
-      font-weight: 500;
-      color: var(--text-4);
+      font-size: var(--fs-md);
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--text-3);
       transition: color .15s, background .15s;
     }
 
@@ -1347,7 +1407,7 @@
     }
 
     .inspector-summary {
-      font-size: 11.5px;
+      font-size: var(--fs-base);
       color: var(--text-3);
       font-family: var(--mono);
       background: var(--bg-2);
@@ -1360,7 +1420,7 @@
     .inspector-messages {
       padding: 4px 14px;
       font-family: var(--mono);
-      font-size: 11.5px;
+      font-size: var(--fs-base);
       line-height: 1.7;
     }
 
@@ -2529,8 +2589,8 @@
       const body = snippet
         ? `<pre class="test-code-pre" style="margin:0"><code class="hljs language-typescript">${hlts(snippet)}</code></pre>`
         : [
-            testCase.description ? `<pre style="margin:0 0 4px 0;white-space:pre-wrap;word-break:break-word;font-family:var(--sans);font-size:11.5px;line-height:1.5">${esc(testCase.description)}</pre>` : '',
-            testCase.expectedBehavior ? `<div style="color:var(--text-3);font-size:10.5px;white-space:pre-wrap">Expected: ${esc(testCase.expectedBehavior)}</div>` : '',
+            testCase.description ? `<pre style="margin:0 0 4px 0;white-space:pre-wrap;word-break:break-word;font-family:var(--sans);font-size:var(--fs-base);line-height:1.5">${esc(testCase.description)}</pre>` : '',
+            testCase.expectedBehavior ? `<div style="color:var(--text-3);font-size:var(--fs-sm);white-space:pre-wrap">Expected: ${esc(testCase.expectedBehavior)}</div>` : '',
           ].filter(Boolean).join('');
       return `<details class="plan-case">` +
         `<summary><span class="plan-case-title">${id}${esc(testCase.name || 'Unnamed case')}</span>` +
@@ -2590,52 +2650,107 @@
     }
 
     function renderUnderstandMethods(snap) {
-      if (!snap?.contractMethods?.length) return '<div class="empty-state">No methods found</div>';
-      const messages = snap.contractMessages || [];
+      const sections = [];
 
-      function findMessage(typeName) {
-        const short = typeName.includes('.') ? typeName.split('.').pop() : typeName;
-        return messages.find(msg => msg.name === short || msg.name === typeName);
-      }
+      // ── Proto section ──────────────────────────────────────
+      if (snap?.contractMethods?.length) {
+        const messages = snap.contractMessages || [];
 
-      function renderMessageBlock(typeName) {
-        const msg = findMessage(typeName);
-        if (!msg?.fields?.length) return '';
-        const short = typeName.includes('.') ? typeName.split('.').pop() : typeName;
-        const fieldLines = msg.fields.map(f => {
-          const modifier = f.repeated ? 'repeated ' : f.optional ? 'optional ' : '';
-          const typeStr = f.mapKeyType ? `map&lt;${esc(f.mapKeyType)}, ${esc(f.mapValueType)}&gt;` : esc(f.type);
-          return `  <span style="color:var(--text-4)">${modifier}</span><span style="color:#79c0ff">${typeStr}</span> <span style="color:var(--text-1)">${esc(f.name)}</span><span style="color:var(--text-4)"> = ${f.number};</span>`;
-        });
-        const oneofLines = (msg.oneofs || []).flatMap(o => [
-          `  <span style="color:var(--text-4)">oneof</span> <span style="color:var(--text-1)">${esc(o.name)}</span> {`,
-          ...o.fields.map(fn => `    <span style="color:var(--text-2)">${esc(fn)}</span>`),
-          `  }`,
-        ]);
-        return `<pre class="test-code-pre" style="margin:2px 0 0;font-size:10px;line-height:1.5;padding:6px 10px">` +
-          `<span style="color:var(--text-4)">message </span><span style="color:var(--accent)">${esc(short)}</span> {\n` +
-          [...fieldLines, ...oneofLines].join('\n') +
-          `\n}</pre>`;
-      }
+        function findMessage(typeName) {
+          const short = typeName.includes('.') ? typeName.split('.').pop() : typeName;
+          return messages.find(msg => msg.name === short || msg.name === typeName);
+        }
 
-      return `<div class="methods-list">${snap.contractMethods.map(m => {
-        const covered = snap.coverage?.coveredMethods?.includes(m.name);
-        const coveredLabel = covered != null
-          ? `<span style="color:${covered ? '#10b981' : 'var(--text-4)'}">${covered ? 'covered' : 'uncovered'}</span>`
-          : '';
-        return `<details class="method-card">` +
-          `<summary>` +
-          `<span class="method-name">${esc(m.name)}</span>` +
-          `<span class="method-meta" style="margin-left:auto">${coveredLabel}</span>` +
+        function renderMessageBlock(typeName) {
+          const msg = findMessage(typeName);
+          if (!msg?.fields?.length) return '';
+          const short = typeName.includes('.') ? typeName.split('.').pop() : typeName;
+          const fieldLines = msg.fields.map(f => {
+            const modifier = f.repeated ? 'repeated ' : f.optional ? 'optional ' : '';
+            const typeStr = f.mapKeyType ? `map&lt;${esc(f.mapKeyType)}, ${esc(f.mapValueType)}&gt;` : esc(f.type);
+            return `  <span style="color:var(--text-4)">${modifier}</span><span style="color:#79c0ff">${typeStr}</span> <span style="color:var(--text-1)">${esc(f.name)}</span><span style="color:var(--text-4)"> = ${f.number};</span>`;
+          });
+          const oneofLines = (msg.oneofs || []).flatMap(o => [
+            `  <span style="color:var(--text-4)">oneof</span> <span style="color:var(--text-1)">${esc(o.name)}</span> {`,
+            ...o.fields.map(fn => `    <span style="color:var(--text-2)">${esc(fn)}</span>`),
+            `  }`,
+          ]);
+          return `<pre class="test-code-pre" style="margin:2px 0 0;font-size:10px;line-height:1.5;padding:6px 10px">` +
+            `<span style="color:var(--text-4)">message </span><span style="color:var(--accent)">${esc(short)}</span> {\n` +
+            [...fieldLines, ...oneofLines].join('\n') +
+            `\n}</pre>`;
+        }
+
+        const requestedMethods = snap.intent?.methods?.length ? snap.intent.methods : null;
+        const methodsToShow = requestedMethods
+          ? snap.contractMethods.filter(m => requestedMethods.includes(m.name))
+          : snap.contractMethods;
+        const methodsHtml = methodsToShow.map(m => {
+          const covered = snap.coverage?.coveredMethods?.includes(m.name);
+          const coveredLabel = covered != null
+            ? `<span style="color:${covered ? '#10b981' : 'var(--text-4)'}">${covered ? 'covered' : 'uncovered'}</span>`
+            : '';
+          return `<details class="method-card">` +
+            `<summary>` +
+            `<span class="method-name">${esc(m.name)}</span>` +
+            `<span class="method-meta" style="margin-left:auto">${coveredLabel}</span>` +
+            `</summary>` +
+            `<div style="padding:2px 10px 8px 10px;border-top:1px solid var(--border)">` +
+            `<div style="margin:4px 0 2px"><span class="inspector-request-key">input</span> <span style="color:var(--text-3);font-size:10px">${esc(m.inputType)}</span></div>` +
+            renderMessageBlock(m.inputType) +
+            `<div style="margin:6px 0 2px"><span class="inspector-request-key">output</span> <span style="color:var(--text-3);font-size:10px">${esc(m.outputType)}</span></div>` +
+            renderMessageBlock(m.outputType) +
+            `</div>` +
+            `</details>`;
+        }).join('');
+
+        sections.push(
+          `<details class="source-section">` +
+          `<summary class="source-section-header">` +
+          `<span class="source-section-icon">▶</span>` +
+          `<span class="source-section-title">Proto</span>` +
+          `<span class="source-section-meta">${methodsToShow.length} method${methodsToShow.length !== 1 ? 's' : ''}</span>` +
           `</summary>` +
-          `<div style="padding:2px 10px 8px 10px;border-top:1px solid var(--border)">` +
-          `<div style="margin:4px 0 2px"><span class="inspector-request-key">input</span> <span style="color:var(--text-3);font-size:10px">${esc(m.inputType)}</span></div>` +
-          renderMessageBlock(m.inputType) +
-          `<div style="margin:6px 0 2px"><span class="inspector-request-key">output</span> <span style="color:var(--text-3);font-size:10px">${esc(m.outputType)}</span></div>` +
-          renderMessageBlock(m.outputType) +
-          `</div>` +
-          `</details>`;
-      }).join('')}</div>`;
+          `<div class="methods-list" style="padding:4px 8px">${methodsHtml}</div>` +
+          `</details>`
+        );
+      }
+
+      // ── Testomatio section ─────────────────────────────────
+      const tmTests = snap?.understand?.manualTestCases;
+      if (tmTests?.length) {
+        const casesHtml = tmTests.map((t, i) => {
+          const tags = (t.tags || []).map(tag =>
+            `<span style="color:var(--text-4);font-size:9px;background:var(--bg-3);border-radius:3px;padding:1px 5px">${esc(tag)}</span>`
+          ).join(' ');
+          return `<details class="method-card">` +
+            `<summary>` +
+            `<span class="method-name" style="font-size:11px">${esc(t.title.replace(/@[\w-]+/g, '').trim())}</span>` +
+            `<span class="method-meta" style="margin-left:auto">${tags}</span>` +
+            `</summary>` +
+            `<div style="padding:6px 10px 8px;border-top:1px solid var(--border)">` +
+            (t.description
+              ? `<pre style="margin:0;white-space:pre-wrap;word-break:break-word;font-family:var(--sans);font-size:11px;line-height:1.6;color:var(--text-2)">${esc(t.description)}</pre>`
+              : '') +
+            `</div>` +
+            `</details>`;
+        }).join('');
+
+        sections.push(
+          `<details class="source-section">` +
+          `<summary class="source-section-header">` +
+          `<span class="source-section-icon">▶</span>` +
+          `<span class="source-section-title">Testomatio</span>` +
+          `<span class="source-section-meta">${tmTests.length} test cases</span>` +
+          `</summary>` +
+          `<div class="methods-list">${casesHtml}</div>` +
+          `</details>`
+        );
+      }
+
+      return sections.length
+        ? `<div class="understand-sources">${sections.join('')}</div>`
+        : '<div class="empty-state">No sources found</div>';
     }
 
     function renderPhaseCosts(costByPhase) {

@@ -33,9 +33,9 @@ const PIPELINE_TOOL: Anthropic.Tool = {
     properties: {
       action: {
         type: "string",
-        enum: ["analyze", "plan", "fix", "implement_only", "validate_only"],
+        enum: ["analyze", "understand_only", "plan", "fix", "implement_only", "validate_only"],
         description:
-          "analyze = coverage only, plan = plans only, fix = repair failures, implement_only = write from saved plans, validate_only = run tests only. Omit for full pipeline (plan+write+validate).",
+          "understand_only = fetch proto + testomatio cases only (no plan/implement), analyze = coverage only, plan = plans only, fix = repair failures, implement_only = write from saved plans, validate_only = run tests only. Omit for full pipeline (plan+write+validate).",
       },
       service: {
         type: "string",
@@ -128,12 +128,13 @@ function buildSystemPrompt(skillTradePath: string): string {
     serviceLines || "  (no services found — SKILL_TRADE_PATH may be wrong)",
     "",
     "## Available Actions",
-    "  (omit)        — full pipeline: plan + write + validate all uncovered methods",
-    "  analyze       — coverage report only, no implementation",
-    "  plan          — generate test plans only (saves them for implement_only)",
-    "  fix           — repair failing tests (run + debug loop)",
-    "  implement_only — write tests from previously saved plans",
-    "  validate_only — run tests only, no write or debug",
+    "  (omit)         — full pipeline: plan + write + validate all uncovered methods",
+    "  understand_only — fetch proto + testomatio cases only, stop before plan/implement",
+    "  analyze        — coverage report only, no implementation",
+    "  plan           — generate test plans only (saves them for implement_only)",
+    "  fix            — repair failing tests (run + debug loop)",
+    "  implement_only  — write tests from previously saved plans",
+    "  validate_only  — run tests only, no write or debug",
     ...(resumeLines.length > 0 ? ["", "## Resumable Context", ...resumeLines] : []),
     "",
     "## Behavior Rules",
@@ -144,6 +145,7 @@ function buildSystemPrompt(skillTradePath: string): string {
     "- Respond in the same language the user writes in.",
     "- Be concise.",
     "- If the user provides a Testomatio URL (testomat.io/projects/.../suite/...): pass it as testomatio_suite_url, infer the service from the slug (e.g. 'cancel-contest' → ContestEngine), and infer the method from the slug in PascalCase (e.g. 'cancel-contest' → CancelContest). Do NOT ask clarifying questions when a URL is provided.",
+    "- Use action: understand_only when the user wants to VIEW or FETCH existing data (proto, test cases, coverage) WITHOUT writing or running tests. The user's intent is to inspect, not to generate.",
   ].join("\n");
 }
 

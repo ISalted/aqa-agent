@@ -6,6 +6,7 @@ import type {
   CoverageReport,
   AgentContext,
   FailurePattern,
+  ImplementationContext,
   RunNotes,
 } from "../types.js";
 import { loadFailurePatterns } from "../memory/failure-patterns.js";
@@ -51,6 +52,7 @@ export function buildCoderContext(
   method: string,
   skillTradePath: string,
   notes?: RunNotes,
+  implementationContext?: ImplementationContext,
 ): AgentContext {
   const skills = loadSkills([
     "grpc-patterns",
@@ -70,7 +72,7 @@ export function buildCoderContext(
     exampleTest: exampleTest ?? undefined,
     wrapperCode: wrapperCode ?? undefined,
     projectRules,
-    runNotes: buildCoderRunNotes(notes, method),
+    runNotes: buildCoderRunNotes(notes, method, implementationContext),
   };
 }
 
@@ -103,13 +105,20 @@ function buildPlannerRunNotes(notes?: RunNotes): string | undefined {
   return parts.length > 0 ? parts.join("\n\n") : undefined;
 }
 
-function buildCoderRunNotes(notes?: RunNotes, method?: string): string | undefined {
-  if (!notes) return undefined;
+function buildCoderRunNotes(notes?: RunNotes, method?: string, implementationContext?: ImplementationContext): string | undefined {
   const parts: string[] = [];
-  if (notes.infrastructure) parts.push(notes.infrastructure);
-  if (notes.coverage) parts.push(notes.coverage);
-  if (method && notes.methodNotes[method]?.plan) {
-    parts.push(`## Plan Notes\n${notes.methodNotes[method].plan}`);
+  if (notes) {
+    if (notes.infrastructure) parts.push(notes.infrastructure);
+    if (notes.coverage) parts.push(notes.coverage);
+    if (method && notes.methodNotes[method]?.plan) {
+      parts.push(`## Plan Notes\n${notes.methodNotes[method].plan}`);
+    }
+  }
+  if (implementationContext?.relevantSettings.length) {
+    const settingsLines = implementationContext.relevantSettings.map(
+      s => `- ${s.accessPattern} — ${s.description} (file: ${s.tableFile})`,
+    );
+    parts.push(`## Relevant noSQL Settings\n${settingsLines.join("\n")}`);
   }
   return parts.length > 0 ? parts.join("\n\n") : undefined;
 }
@@ -257,6 +266,13 @@ function buildCoderSystemPrompt(): string {
 - Each test must be self-contained — no shared mutable state between tests
 - Use the exact test case IDs from the plan in every test title
 - Write the COMPLETE file — no partial code, no TODOs, no placeholder comments
+
+## Dynamic Settings Rule
+When a test needs min/max values, counts, or configuration limits:
+- DO NOT hardcode numbers
+- READ the value at runtime from noSQL/db fixture if available
+- Example: const settings = await noSQL.contestSettings.get(); const min = settings[0].MinParticipants;
+- This makes tests resilient to configuration changes
 
 Output ONLY the complete TypeScript file content. No explanations, no markdown fences.`;
 }
